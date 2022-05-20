@@ -1,0 +1,33 @@
+# /etc/conf.d/neoxad: config file for /etc/init.d/neoxad
+
+# Config file location
+#NEOXAD_CONFIGFILE="/etc/neoxa/neoxa.conf"
+
+# What directory to write pidfile to?  (created and owned by $NEOXAD_USER)
+#NEOXAD_PIDDIR="/var/run/neoxad"
+
+# What filename to give the pidfile
+#NEOXAD_PIDFILE="${NEOXAD_PIDDIR}/neoxad.pid"
+
+# Where to write neoxad data (be mindful that the blockchain is large)
+#NEOXAD_DATADIR="/var/lib/neoxad"
+
+# User and group to own neoxad process
+#NEOXAD_USER="neoxa"
+#NEOXAD_GROUP="neoxa"
+
+# Path to neoxad executable
+#NEOXAD_BIN="/usr/bin/neoxad"
+
+# Nice value to run neoxad under
+#NEOXAD_NICE=0
+
+# Additional options (avoid -conf and -datadir, use flags above)
+#NEOXAD_OPTS=""
+
+# The timeout in seconds OpenRC will wait for neoxad to terminate
+# after a SIGTERM has been raised.
+# Note that this will be mapped as argument to start-stop-daemon's
+# '--retry' option, which means you can specify a retry schedule
+# here. For more information see man 8 start-stop-daemon.
+NEOXAD_SIGTERM_TIMEOUT=60

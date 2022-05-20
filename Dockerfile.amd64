@@ -1,0 +1,27 @@
+FROM amd64/ubuntu:latest
+
+MAINTAINER cade <cade.call@mediciventures.com>
+
+EXPOSE $RPCPORT
+
+EXPOSE $PORT
+
+RUN apt-get update && apt-get install -y bash net-tools && apt-get clean
+
+RUN useradd -ms /bin/bash neoxa
+
+RUN mkdir /etc/neoxa
+
+RUN mkdir /var/lib/neoxa
+
+RUN chown neoxa:neoxa /etc/neoxa /var/lib/neoxa
+
+WORKDIR /home/neoxa
+
+COPY --chown=neoxa:neoxa linux64/* /home/neoxa/
+
+COPY --chown=neoxa:neoxa run.sh /home/neoxa/
+
+USER neoxa
+
+CMD ["/home/neoxa/run.sh"]

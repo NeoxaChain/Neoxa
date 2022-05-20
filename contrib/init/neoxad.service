@@ -1,0 +1,22 @@
+[Unit]
+Description=Neoxa's distributed currency daemon
+After=network.target
+
+[Service]
+User=neoxa
+Group=neoxa
+
+Type=forking
+PIDFile=/var/lib/neoxad/neoxad.pid
+ExecStart=/usr/bin/neoxad -daemon -pid=/var/lib/neoxad/neoxad.pid \
+-conf=/etc/neoxa/neoxa.conf -datadir=/var/lib/neoxad -disablewallet
+
+Restart=always
+PrivateTmp=true
+TimeoutStopSec=60s
+TimeoutStartSec=2s
+StartLimitInterval=120s
+StartLimitBurst=5
+
+[Install]
+WantedBy=multi-user.target

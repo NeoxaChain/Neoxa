@@ -1,0 +1,23 @@
+FROM arm32v7/ubuntu:latest
+
+MAINTAINER cade <cade.call@mediciventures.com>
+
+EXPOSE $RPCPORT
+
+EXPOSE $PORT
+
+RUN useradd -ms /bin/bash neoxa
+
+RUN mkdir /etc/neoxa
+
+RUN mkdir /var/lib/neoxa
+
+RUN chown neoxa:neoxa /etc/neoxa /var/lib/neoxa
+
+WORKDIR /home/neoxa
+
+COPY --chown=neoxa:neoxa linux64/* ./run.sh /home/neoxa/
+
+USER neoxa
+
+CMD ["/home/neoxa/run.sh"]
