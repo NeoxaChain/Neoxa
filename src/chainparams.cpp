@@ -121,42 +121,42 @@ public:
         consensus.nRuleChangeActivationThreshold = 1613; // Approx 80% of 2016
         consensus.nMinerConfirmationWindow = 2016; // nPowTargetTimespan / nPowTargetSpacing
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit = 28;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime = 1613880000; // 2021-02-21 12:00:00
-        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout = 1617120000; // 2021-03-31 00:00:00
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime = 1653004800; // Friday, 20 May 2022 00:00:00
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout = 1653264000; // Monday, 23 May 2022 00:00:00
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nOverrideRuleChangeActivationThreshold = 1814;
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nOverrideMinerConfirmationWindow = 2016;
         consensus.vDeployments[Consensus::DEPLOYMENT_ASSETS].bit = 6;  //Assets (HIP2)
-        consensus.vDeployments[Consensus::DEPLOYMENT_ASSETS].nStartTime = 1613880000; // 2021-02-21 12:00:00
-        consensus.vDeployments[Consensus::DEPLOYMENT_ASSETS].nTimeout = 1617120000; // 2021-03-31 00:00:00
+        consensus.vDeployments[Consensus::DEPLOYMENT_ASSETS].nStartTime = 1653004800; // Friday, 20 May 2022 00:00:00
+        consensus.vDeployments[Consensus::DEPLOYMENT_ASSETS].nTimeout = 1653264000; // Monday, 23 May 2022 00:00:00
         consensus.vDeployments[Consensus::DEPLOYMENT_ASSETS].nOverrideRuleChangeActivationThreshold = 1814;
         consensus.vDeployments[Consensus::DEPLOYMENT_ASSETS].nOverrideMinerConfirmationWindow = 2016;
         consensus.vDeployments[Consensus::DEPLOYMENT_MSG_REST_ASSETS].bit = 7;  // Assets (HIP5)
-        consensus.vDeployments[Consensus::DEPLOYMENT_MSG_REST_ASSETS].nStartTime = 1613880000; // 2021-02-21 12:00:00
-        consensus.vDeployments[Consensus::DEPLOYMENT_MSG_REST_ASSETS].nTimeout = 1617120000; // 2021-03-31 00:00:00
+        consensus.vDeployments[Consensus::DEPLOYMENT_MSG_REST_ASSETS].nStartTime = 1653004800; // Friday, 20 May 2022 00:00:00
+        consensus.vDeployments[Consensus::DEPLOYMENT_MSG_REST_ASSETS].nTimeout = 1653264000; // Monday, 23 May 2022 00:00:00
         consensus.vDeployments[Consensus::DEPLOYMENT_MSG_REST_ASSETS].nOverrideRuleChangeActivationThreshold = 1714; // Approx 85% of 2016
         consensus.vDeployments[Consensus::DEPLOYMENT_MSG_REST_ASSETS].nOverrideMinerConfirmationWindow = 2016;
         consensus.vDeployments[Consensus::DEPLOYMENT_TRANSFER_SCRIPT_SIZE].bit = 8;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TRANSFER_SCRIPT_SIZE].nStartTime = 1613880000; // 2021-02-21 12:00:00
-        consensus.vDeployments[Consensus::DEPLOYMENT_TRANSFER_SCRIPT_SIZE].nTimeout = 1617120000; // 2021-03-31 00:00:00
+        consensus.vDeployments[Consensus::DEPLOYMENT_TRANSFER_SCRIPT_SIZE].nStartTime = 1653004800; // Friday, 20 May 2022 00:00:00
+        consensus.vDeployments[Consensus::DEPLOYMENT_TRANSFER_SCRIPT_SIZE].nTimeout = 1653264000; // Monday, 23 May 2022 00:00:00
         consensus.vDeployments[Consensus::DEPLOYMENT_TRANSFER_SCRIPT_SIZE].nOverrideRuleChangeActivationThreshold = 1714; // Approx 85% of 2016
         consensus.vDeployments[Consensus::DEPLOYMENT_TRANSFER_SCRIPT_SIZE].nOverrideMinerConfirmationWindow = 2016;
         consensus.vDeployments[Consensus::DEPLOYMENT_ENFORCE_VALUE].bit = 9;
-        consensus.vDeployments[Consensus::DEPLOYMENT_ENFORCE_VALUE].nStartTime = 1613880000; // 2021-02-21 12:00:00
-        consensus.vDeployments[Consensus::DEPLOYMENT_ENFORCE_VALUE].nTimeout = 1617120000; // 2021-03-31 00:00:00
+        consensus.vDeployments[Consensus::DEPLOYMENT_ENFORCE_VALUE].nStartTime = 1653004800; // Friday, 20 May 2022 00:00:00
+        consensus.vDeployments[Consensus::DEPLOYMENT_ENFORCE_VALUE].nTimeout = 1653264000; // Monday, 23 May 2022 00:00:00
         consensus.vDeployments[Consensus::DEPLOYMENT_ENFORCE_VALUE].nOverrideRuleChangeActivationThreshold = 1411; // Approx 70% of 2016
         consensus.vDeployments[Consensus::DEPLOYMENT_ENFORCE_VALUE].nOverrideMinerConfirmationWindow = 2016;
         consensus.vDeployments[Consensus::DEPLOYMENT_COINBASE_ASSETS].bit = 10;
-        consensus.vDeployments[Consensus::DEPLOYMENT_COINBASE_ASSETS].nStartTime = 1613880000; // 2021-02-21 12:00:00
-        consensus.vDeployments[Consensus::DEPLOYMENT_COINBASE_ASSETS].nTimeout = 1628877600; // UTC: Fri Aug 13 2021 18:00:00
+        consensus.vDeployments[Consensus::DEPLOYMENT_COINBASE_ASSETS].nStartTime = 1653004800; // Friday, 20 May 2022 00:00:00
+        consensus.vDeployments[Consensus::DEPLOYMENT_COINBASE_ASSETS].nTimeout = 1653264000; // Monday, 23 May 2022 00:00:00
         consensus.vDeployments[Consensus::DEPLOYMENT_COINBASE_ASSETS].nOverrideRuleChangeActivationThreshold = 1411; // Approx 70% of 2016
         consensus.vDeployments[Consensus::DEPLOYMENT_COINBASE_ASSETS].nOverrideMinerConfirmationWindow = 2016;
 
 
         // The best chain should have at least this much work
-        consensus.nMinimumChainWork = uint256S("0x000000000000000000000000000000000000000000000000000027b2cc5667b2"); // Block 1901
+        consensus.nMinimumChainWork = uint256S("0x00000000000000000000000000000000000000000000000000017dd6d0f575f6"); // Block 2584
 
         // By default assume that the signatures in ancestors of this block are valid. Block# 
-        consensus.defaultAssumeValid = uint256S("0x0000000000ff8eae13ed535dcc5572800f4ec52da2317997d2bcb4bb2623c894"); // Block 1901
+        consensus.defaultAssumeValid = uint256S("0x00000000011fa011db665cb29ea1961230de1729f615f09037ae6745e931009c"); // Block 2584
 
         /**
          * The message start string is designed to be unlikely to occur in normal data.
@@ -265,7 +265,8 @@ public:
             	{
             		{0, uint256S("0000000a50fdaaf22f1c98b8c61559e15ab2269249aa1fb20683180703cdbf07")},
                 {1600, uint256S("000000000dae516974be0590d0dcd1ba8ecd28f6969cd04b719dfec483445286")},
-                {1900, uint256S("00000000008ec6725fd46ab63b46d30f34632ce3caec68c59aae5fc19092871f")}
+                {1900, uint256S("00000000008ec6725fd46ab63b46d30f34632ce3caec68c59aae5fc19092871f")},
+                {2582, uint256S("00000000002029b6964d84ee232c027573c9b33da2673f9cdeed5238a1b65a32")}
             	}
             }
         };
