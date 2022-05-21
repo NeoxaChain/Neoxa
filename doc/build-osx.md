@@ -35,7 +35,8 @@ you can use [this](/contrib/install_db4.sh) script to install it
 like so:
 
 ```shell
-CFLAGS="-Wno-error=implicit-function-declaration"  ./contrib/install_db4.sh .
+brew install berkeley-db4
+brew link berkeley-db4 --force
 ```
 
 from the root of the repository.
