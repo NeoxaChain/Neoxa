@@ -35,7 +35,7 @@ you can use [this](/contrib/install_db4.sh) script to install it
 like so:
 
 ```shell
-brew install berkeley-db4
+brew install berkeley-db@4
 brew link berkeley-db4 --force
 ```
 
