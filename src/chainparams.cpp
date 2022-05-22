@@ -384,7 +384,7 @@ public:
         nAddNullQualifierTagBurnAmount = .1 * COIN;
 		
 	//10% of 5000 COIN to ASSIGN
-	nCommunityAutonomousAmount = 20;
+	nCommunityAutonomousAmount = 15;
 
         // Burn Addresses
 	strIssueAssetBurnAddress = "J1VQJKLSLVZ4syiCAx5hEPq8BrkFaxAXAi";
@@ -400,7 +400,7 @@ public:
         strGlobalBurnAddress = "JGYQBki6wWWnJLp2dcgdtNZWs9a2e1nXM3";
 		
 	//CommunityAutonomousAddress
-        strCommunityAutonomousAddress = "JCPncGFawSDgP3CmG19MB6cbKP5XuhXY4u";
+        strCommunityAutonomousAddress = "J8db9nuaVL3Jo8hDcfKh77pZnG2J8jvxWH";
 
         // DGW Activation
         nDGWActivationBlock = 1;
