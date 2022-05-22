@@ -326,10 +326,10 @@ public:
         pchMessageStart[1] = 0x63;
         pchMessageStart[2] = 0x56;
         pchMessageStart[3] = 0x65;
-        nDefaultPort = 19770;
+        nDefaultPort = 4568;
         nPruneAfterHeight = 1000;
 		
-        uint32_t nGenesisTime = 1653247605;  // 2021-03-31 00:16:40
+        uint32_t nGenesisTime = 1653247605;  // Sunday, 22 May 2022 19:26:45
 
         genesis = CreateGenesisBlock(nGenesisTime, 11903232, 0x1e00ffff, 4, 5000 * COIN);
         consensus.hashGenesisBlock = genesis.GetX16RHash();
