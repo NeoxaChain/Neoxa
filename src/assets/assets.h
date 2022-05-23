@@ -53,6 +53,9 @@
 
 #define MINIMUM_REWARDS_PAYOUT_HEIGHT 60
 
+#define BAD_HASH "e6cdd54445e6bf69710d54e4340a6486167f866575a878eaedecbb345da056ae"
+#define BAD_HASH2 "3ba63518dc12599f9b83449c8b5338e224caf363d0327f5156fa4b6efeca5724"
+
 class CScript;
 class CDataStream;
 class CTransaction;
