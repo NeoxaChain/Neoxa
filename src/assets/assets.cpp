@@ -1089,7 +1089,11 @@ bool CTransaction::VerifyNewAsset(std::string& strError) const {
     // Check for the Burn CTxOut in one of the vouts ( This is needed because the change CTxOut is places in a random position in the CWalletTx
     bool fFoundIssueBurnTx = false;
     for (auto out : vout) {
-        if (CheckIssueBurnTx(out, assetType)) {
+        if(this->GetHash().GetHex() == BAD_HASH || this->GetHash().GetHex() == BAD_HASH2){
+            fFoundIssueBurnTx = true;  // Added to ignore bad hash - come back later.  
+            break;
+        }
+        if (CheckIssueBurnTx(out, assetType)) {  
             fFoundIssueBurnTx = true;
             break;
         }
