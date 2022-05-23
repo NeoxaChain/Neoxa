@@ -180,7 +180,7 @@ public:
         assert(genesis.hashMerkleRoot == uint256S("7c1d71731b98c560a80cee3b88993c8c863342b9661894304fd843bf7e75a41f"));
 
 
-        vSeeds.emplace_back("", false);
+        vSeeds.emplace_back("seed.neoxa.net", false);
 
         // Address start with G
         base58Prefixes[PUBKEY_ADDRESS] = std::vector<unsigned char>(1,38);
