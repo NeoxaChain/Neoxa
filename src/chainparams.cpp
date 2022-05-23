@@ -235,17 +235,17 @@ public:
 	nCommunityAutonomousAmount = 15;
 
         // Burn Addresses
-	strIssueAssetBurnAddress = "GcmKXqWrFrbDnywuY8F3orEnNR5L1g2mZQ";
-        strReissueAssetBurnAddress = "GX61EFYjZdXKWAY5UsBt5sLxHkWaqjBL59";
-        strIssueSubAssetBurnAddress = "GNgg3bLoGocLD9iU2W1gw3McHipzfZ8R13";
-        strIssueUniqueAssetBurnAddress = "GKXyGTyzibPLhPpTpvqqBK3SJBz8gp7Kfa";
-        strIssueMsgChannelAssetBurnAddress = "GMm13zRL8eGjZxYXfiCN1zCJFHiL5HkMYa";
-        strIssueQualifierAssetBurnAddress = "GZW36RFFgRWcCQ3cN1qWJGC6z4EAqgt7M6";
-        strIssueSubQualifierAssetBurnAddress = "GcDdxyK7JCuQfg83SxFHRpD8QHFivbdYjZ";
-        strIssueRestrictedAssetBurnAddress = "GcDdxyK7JCuQfg83SxFHRpD8QHFivbdYjZ";
-        strAddNullQualifierTagBurnAddress = "GTfS34Z3CrzXSPEmGx9xpjw7PShUC93YFi";
+	strIssueAssetBurnAddress = "Ggei24MHwhWDDRn6d97uVkp4PXPb3WHBzt";
+        strReissueAssetBurnAddress = "GRGmCXSTzb8JYYx52854HuBGny5yfegHWX";
+        strIssueSubAssetBurnAddress = "GbGiK6bvUMDu93XU4x5YXLvpzaxUVhiU9D";
+        strIssueUniqueAssetBurnAddress = "GaAXAUiTjQdkpusDPVfcT3sRyUGaMjTSjH";
+        strIssueMsgChannelAssetBurnAddress = "GLiKcXnTLPfTzTHEgxC9B7iaEFghEwQ79M";
+        strIssueQualifierAssetBurnAddress = "GdsUNCrrb1BQbm98zdJhy6AeNf1n7qmqpY";
+        strIssueSubQualifierAssetBurnAddress = "GT1zEFNzf6MVMS7Sv9sXnXpCsjAbLzT3W6";
+        strIssueRestrictedAssetBurnAddress = "GJ4iHQM5Qgp63bdjvP7G6yXATfhaXNa4iw";
+        strAddNullQualifierTagBurnAddress = "GYZ2jgHzBCiM22GFTwfLiRgGc9AiXkapm6";
         //Global Burn Address
-        strGlobalBurnAddress = "GeNvn7GXr1aLqhDx9HG9aYWnPA5qoRsz9X";
+        strGlobalBurnAddress = "GL3cUNSAYtCyLzzyx2FDjTyQmUUMAef6ct";
         // Proof-Of-Play Address
         strCommunityAutonomousAddress = "GTbBCJzqRWyFBMrap2fY39eZaXnLnojJ3F";
 
