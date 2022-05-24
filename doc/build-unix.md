@@ -37,6 +37,24 @@ To resolve or avoid the following build error specify the following configure pa
 make clean
 make
 ```
+Ubuntu 16.04/18.04 Static Building
+---------------------
+First we need to set the paths as depends building will fail
+
+	PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games
+
+Let's start building the source code
+
+	make HOST=x86_64-linux-gnu -j4
+	cd ..
+	sudo ./autogen.sh
+	
+	CONFIG_SITE=$PWD/depends/x86_64-linux-gnu/share/config.site ./configure --prefix=/ --disable-ccache --disable-maintainer-mode --disable-dependency-tracking --enable-	     glibc-back-compat --enable-reduce-exports --disable-bench --disable-gui-tests CFLAGS="-O2 -g" CXXFLAGS="-O2 -g" LDFLAGS="-static-libstdc++"
+	
+	make -j4 
+	
+	make -C src check-security 
+
 
 Dependencies
 ---------------------
