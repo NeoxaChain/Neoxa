@@ -44,7 +44,7 @@ First we need to set the paths as depends building will fail
 	PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games
 
 Let's start building the source code
-
+	cd depends
 	make HOST=x86_64-linux-gnu -j4
 	cd ..
 	sudo ./autogen.sh
