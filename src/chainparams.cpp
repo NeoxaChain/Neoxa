@@ -181,6 +181,8 @@ public:
 
 
         vSeeds.emplace_back("seed.neoxa.net", false);
+	vSeeds.emplace_back("seed1.neoxa.net", false);
+	vSeeds.emplace_back("seed2.neoxa.net", false); 
 
         // Address start with G
         base58Prefixes[PUBKEY_ADDRESS] = std::vector<unsigned char>(1,38);
