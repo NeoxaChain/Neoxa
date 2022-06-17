@@ -219,10 +219,10 @@ public:
 
         chainTxData = ChainTxData{
             // Update as we know more about the contents of the Neoxa chain
-        	1654208769, // * UNIX timestamp of last known number of transactions 2021-02-21 05:09:15
-            28600,    // * total number of transactions between genesis and that timestamp
+        	1655506986, // * UNIX timestamp of last known number of transactions 2021-06-18 22:03:06 UTC
+            65420,    // * total number of transactions between genesis and that timestamp
                         //   (the tx=... number in the SetBestChain debug.log lines)
-            0.02364903697859943       // * estimated number of transactions per second after that timestamp
+            0.02602302389531765       // * estimated number of transactions per second after that timestamp
         };
 
 
