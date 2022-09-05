@@ -156,10 +156,10 @@ public:
 
 
         // The best chain should have at least this much work
-        consensus.nMinimumChainWork = uint256S("000000000000000000000000000000000000000000000000009363c5f53c59bd"); // Block 35900
+        consensus.nMinimumChainWork = uint256S("0000000000000000000000000000000000000000000000001395dd8e70866177"); // Block 157581
 
         // By default assume that the signatures in ancestors of this block are valid. Block# 
-        consensus.defaultAssumeValid = uint256S("0x00000000006fa70f70804bc376871d1a75a6b120b32948f0c97b6cb69f05c0ec"); // Block 35900
+        consensus.defaultAssumeValid = uint256S("0x0000000000008ea299bed393aaeedcdac66baf26c7228c60636fa432addc4777"); // Block 157581
 
         /**
          * The message start string is designed to be unlikely to occur in normal data.
@@ -213,17 +213,18 @@ public:
 		{7339, uint256S("00000000012be3885f8c8648cacf55b1ee45021cf3c5dd214c61526e5bf81363")},
 		{20000, uint256S("0000000000e244579b5e0a2622db902bba222022577aff23169506893bb18fc2")},
 		{28862, uint256S("000000000032b28e62977a388f241c3119a00e375471b84569995d1e29a63e0b")},
-		{35900, uint256S("00000000006fa70f70804bc376871d1a75a6b120b32948f0c97b6cb69f05c0ec")}
+		{35900, uint256S("00000000006fa70f70804bc376871d1a75a6b120b32948f0c97b6cb69f05c0ec")},
+		{157581, uint256S("0000000000008ea299bed393aaeedcdac66baf26c7228c60636fa432addc4777")}	
             	}
             }
         };
 
         chainTxData = ChainTxData{
             // Update as we know more about the contents of the Neoxa chain
-        	1655506986, // * UNIX timestamp of last known number of transactions 2021-06-18 22:03:06 UTC
-            65420,    // * total number of transactions between genesis and that timestamp
+        	1662386772, // * UNIX timestamp of last known number of transactions 2021-06-18 22:03:06 UTC
+            130153,    // * total number of transactions between genesis and that timestamp
                         //   (the tx=... number in the SetBestChain debug.log lines)
-            0.02602302389531765       // * estimated number of transactions per second after that timestamp
+            0.05014635153727871       // * estimated number of transactions per second after that timestamp
         };
 
 
