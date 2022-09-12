@@ -326,10 +326,10 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_COINBASE_ASSETS].nOverrideMinerConfirmationWindow = 2016;
 
         // The best chain should have at least this much work.
-        consensus.nMinimumChainWork = uint256S("0x0");
+        consensus.nMinimumChainWork = uint256S("000000000000000000000000000000000000000000000000000000000258f180"); // Block 380
 
         // By default assume that the signatures in ancestors of this block are valid.
-        consensus.defaultAssumeValid = uint256S("0x0");
+        consensus.defaultAssumeValid = uint256S("0x0000000b9c35b2ffd53effa1b922985f332ba418f9f813649d8247bf718eb1f2"); // Block 380
 
 
         pchMessageStart[0] = 0x60;
