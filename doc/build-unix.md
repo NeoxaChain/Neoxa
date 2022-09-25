@@ -48,7 +48,7 @@ Let's start building the source code, finished compilation will be under Neoxa/s
 	cd depends
 	make HOST=x86_64-linux-gnu -j4
 	cd ..
-	sudo ./autogen.sh
+	./autogen.sh
 	
 	CONFIG_SITE=$PWD/depends/x86_64-linux-gnu/share/config.site ./configure --prefix=/ CFLAGS="-O2 -g" CXXFLAGS="-O2 -g" LDFLAGS="-static-libstdc++"
 	
