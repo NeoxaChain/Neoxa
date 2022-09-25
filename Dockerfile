@@ -37,7 +37,7 @@ RUN apt-get update && \
 #Build Neoxa from source
 COPY . /home/neoxa/build/Neoxa/
 WORKDIR /home/neoxa/build/Neoxa
-RUN chmod +x ./autogen.sh && ./autogen.sh && ./configure --disable-tests --with-gui=no && make
+RUN chmod +x ./autogen.sh && chmod +x share/genbuild.sh && ./autogen.sh && ./configure --disable-tests --with-gui=no && make
 
 FROM base AS final
 
