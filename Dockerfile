@@ -12,7 +12,8 @@ RUN apt-get update && \
 
 #Install runtime dependencies
 RUN apt-get update && \
-	apt-get install -y --no-install-recommends \
+	apt-get dist-upgrade -yqq && \
+        apt-get install -y --no-install-recommends \
 	bash net-tools libminiupnpc10 \
 	libevent-2.1 libevent-pthreads-2.1 \
 	libdb4.8 libdb4.8++ \
