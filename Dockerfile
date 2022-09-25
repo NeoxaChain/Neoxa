@@ -12,7 +12,8 @@ RUN apt-get update && \
 
 #Install runtime dependencies
 RUN apt-get update && \
-	apt-get install -y --no-install-recommends \
+	apt-get dist-upgrade -yqq && \
+        apt-get install -y --no-install-recommends \
 	bash net-tools libminiupnpc10 \
 	libevent-2.1 libevent-pthreads-2.1 \
 	libdb4.8 libdb4.8++ \
@@ -37,7 +38,7 @@ RUN apt-get update && \
 #Build Neoxa from source
 COPY . /home/neoxa/build/Neoxa/
 WORKDIR /home/neoxa/build/Neoxa
-RUN ./autogen.sh && ./configure --disable-tests --with-gui=no && make
+RUN chmod +x ./autogen.sh && chmod +x share/genbuild.sh && ./autogen.sh && ./configure --disable-tests --with-gui=no && make
 
 FROM base AS final
 
