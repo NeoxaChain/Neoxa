@@ -254,7 +254,7 @@ public:
         strAddNullQualifierTagBurnAddress = "GTfS34Z3CrzXSPEmGx9xpjw7PShUC93YFi";
         //Global Burn Address
         strGlobalBurnAddress = "GeNvn7GXr1aLqhDx9HG9aYWnPA5qoRsz9X";
-        // Proof-Of-Play Address
+        // ProofOfGame Address
         strCommunityAutonomousAddress = "GTbBCJzqRWyFBMrap2fY39eZaXnLnojJ3F";
 
         // DGW Activation
