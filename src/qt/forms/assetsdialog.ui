@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1070</width>
-    <height>822</height>
+    <height>541</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -20,19 +20,19 @@
    <item>
     <layout class="QVBoxLayout" name="verticalLayout_3">
      <property name="spacing">
-      <number>34</number>
+      <number>6</number>
      </property>
      <property name="leftMargin">
-      <number>40</number>
+      <number>0</number>
      </property>
      <property name="topMargin">
-      <number>40</number>
+      <number>0</number>
      </property>
      <property name="rightMargin">
-      <number>40</number>
+      <number>0</number>
      </property>
      <property name="bottomMargin">
-      <number>40</number>
+      <number>0</number>
      </property>
      <item>
       <widget class="QFrame" name="frameAssetControl">
@@ -604,8 +604,8 @@
          <rect>
           <x>0</x>
           <y>0</y>
-          <width>964</width>
-          <height>165</height>
+          <width>1048</width>
+          <height>91</height>
          </rect>
         </property>
         <layout class="QVBoxLayout" name="verticalLayout_2" stretch="0,1">
@@ -873,7 +873,7 @@
                     </widget>
                    </item>
                    <item>
-                    <widget class="NeoxaAmountField" name="customFee"/>
+                    <widget class="BitcoinAmountField" name="customFee"/>
                    </item>
                    <item>
                     <spacer name="horizontalSpacer_6">
@@ -1122,16 +1122,6 @@
                </item>
               </layout>
              </item>
-             <item>
-              <widget class="QCheckBox" name="optInRBF">
-               <property name="toolTip">
-                <string>Indicates that the sender may wish to replace this transaction with a new one paying higher fees (prior to being confirmed).</string>
-               </property>
-               <property name="text">
-                <string>Request Replace-By-Fee</string>
-               </property>
-              </widget>
-             </item>
             </layout>
            </widget>
           </item>
@@ -1170,7 +1160,7 @@
           <string>S&amp;end</string>
          </property>
          <property name="icon">
-          <iconset resource="../neoxa.qrc">
+          <iconset>
            <normaloff>:/icons/send</normaloff>:/icons/send</iconset>
          </property>
          <property name="autoDefault">
@@ -1196,7 +1186,7 @@
           <string>Clear &amp;All</string>
          </property>
          <property name="icon">
-          <iconset resource="../neoxa.qrc">
+          <iconset>
            <normaloff>:/icons/remove</normaloff>:/icons/remove</iconset>
          </property>
          <property name="autoDefault">
@@ -1207,13 +1197,13 @@
        <item>
         <widget class="QPushButton" name="addButton">
          <property name="toolTip">
-          <string>Send to multiple recipients at once</string>
+          <string>Transfer to multiple recipients at once</string>
          </property>
          <property name="text">
           <string>Add &amp;Recipient</string>
          </property>
          <property name="icon">
-          <iconset resource="../neoxa.qrc">
+          <iconset>
            <normaloff>:/icons/add</normaloff>:/icons/add</iconset>
          </property>
          <property name="autoDefault">
@@ -1240,7 +1230,7 @@
           <number>3</number>
          </property>
          <item>
-          <widget class="QLabel" name="label">
+          <widget class="QLabel" name="labelBalanceText">
            <property name="sizePolicy">
             <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
              <horstretch>0</horstretch>
@@ -1283,17 +1273,17 @@
   <customwidget>
    <class>QValidatedLineEdit</class>
    <extends>QLineEdit</extends>
-   <header>qvalidatedlineedit.h</header>
+   <header>qt/qvalidatedlineedit.h</header>
   </customwidget>
   <customwidget>
-   <class>NeoxaAmountField</class>
+   <class>BitcoinAmountField</class>
    <extends>QLineEdit</extends>
-   <header>neoxaamountfield.h</header>
+   <header>qt/bitcoinamountfield.h</header>
    <container>1</container>
   </customwidget>
  </customwidgets>
  <resources>
-  <include location="../neoxa.qrc"/>
+  <include location="../raptoreum.qrc"/>
  </resources>
  <connections/>
  <buttongroups>

@@ -1,14 +1,13 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2016 The Bitcoin Core developers
-// Copyright (c) 2017-2021 The Raven Core developers
+// Copyright (c) 2009-2015 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 /**
  * Utilities for converting data from/to strings.
  */
-#ifndef NEOXA_UTILSTRENCODINGS_H
-#define NEOXA_UTILSTRENCODINGS_H
+#ifndef BITCOIN_UTILSTRENCODINGS_H
+#define BITCOIN_UTILSTRENCODINGS_H
 
 #include <stdint.h>
 #include <string>
@@ -70,13 +69,6 @@ int atoi(const std::string& str);
 bool ParseInt32(const std::string& str, int32_t *out);
 
 /**
- * Convert string to unsigned 32-bit integer with strict parse error feedback.
- * @returns true if the entire string could be parsed as valid integer,
- *   false if not the entire string could be parsed or when overflow or underflow occurred.
- */
-bool ParseUInt32(const std::string& str, uint32_t *out);
-
-/**
  * Convert string to signed 64-bit integer with strict parse error feedback.
  * @returns true if the entire string could be parsed as valid integer,
  *   false if not the entire string could be parsed or when overflow or underflow occurred.
@@ -95,7 +87,7 @@ bool ParseUInt32(const std::string& str, uint32_t *out);
  * @returns true if the entire string could be parsed as valid integer,
  *   false if not the entire string could be parsed or when overflow or underflow occurred.
  */
-bool ParseUInt64(const std::string& str, uint64_t *out, int base = 10);
+bool ParseUInt64(const std::string& str, uint64_t *out);
 
 /**
  * Convert string to double with strict parse error feedback.
@@ -157,4 +149,4 @@ bool TimingResistantEqual(const T& a, const T& b)
  */
 bool ParseFixedPoint(const std::string &val, int decimals, int64_t *amount_out);
 
-#endif // NEOXA_UTILSTRENCODINGS_H
+#endif // BITCOIN_UTILSTRENCODINGS_H

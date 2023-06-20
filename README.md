@@ -5,11 +5,11 @@ https://Neoxa.net
 
 What is Neoxa?
 -----------------
-Neoxa is a blockchain that features assets and the ability to obtain cryptocurrency while playing games. Neoxa is a Proof of Work minable coin. Proof of Game is a new way for gamers to participate in blockchain technology, simply by playing games. Until now, the minable cryptocurrency communities and gaming communities have been separated by a graphic card shortage. With Neoxa, both these communities can come together and get a piece of the block. See the Neoxa whitepaper: https://www.neoxa.net/whitepaper
+Neoxa is a blockchain platform that combines gaming and cryptocurrency by allowing users to earn cryptocurrency while playing games. It operates on a Proof of Work mining system. The concept of "Play to Earn" enables gamers to engage with blockchain technology by playing games and receiving rewards. Neoxa aims to bridge the gap between the minable cryptocurrency and gaming communities, providing an opportunity for both to benefit from the blockchain. For more detailed information, please refer to the Neoxa whitepaper available at https://www.neoxa.net/whitepaper.
 
-Neoxa aims to allow gamers to play their favourite games and at the same time earn Neoxa as a reward. Majority of our developers have been gaming for years and have some exciting features to add within our gaming servers. How will we do it? Well... the beauty of PC Gaming and even console (Yes, we have a way to make this happen) is that modding is available to implement all the monitoring features we need to make our vision a reality.
+Neoxa is dedicated to providing gamers with the opportunity to earn Neoxa cryptocurrency while indulging in their favorite games. Our team consists of experienced developers who have a deep passion for gaming, and we are excited to introduce innovative features within our gaming servers. Leveraging the flexibility of PC Gaming and even console platforms, we can utilize modding to incorporate the necessary monitoring functionalities to bring our vision to life.
 
-Time after time we see blockchains popping up with no realistic goals or the work never carried out, this is why we provide a Proof of Concept on day one of launching. It's important to showcase our vision and how the barebones of the system will work and expand on this over the months and years.
+In contrast to numerous blockchain projects that lack realistic goals or fail to follow through with their plans, Neoxa stands apart by delivering a Proof of Concept right from its launch. We believe in demonstrating the feasibility of our ideas and ensuring tangible progress, earning the trust and confidence of our community.
 
 License
 -------
@@ -41,9 +41,7 @@ not straightforward.
 About Neoxa
 --------------
 
-Neoxa is the currency for investors, gamers and gaming developers. 
-Neoxa will be implemented to games such as Minecraft, Roblox and many other popular games that allows custom modifications and servers.
-It does not stop there, with blockchain assets, developers can implement Neoxa assets into any game and feature it in the upcoming Neoxa marketplace.
+Neoxa serves as a versatile currency catering to investors, gamers, and gaming developers alike. To enhance the gaming experience and provide earning opportunities, Neoxa has implemented innovative Play to Earn mechanisms within popular games such as Minecraft, Rust, and Grand Theft Auto. By participating in these games, our dedicated gamers can effortlessly earn Neoxa without requiring any financial investment.
 
 Thank you to the Bitcoin developers.
 Thank you to the Ravencoin developers.

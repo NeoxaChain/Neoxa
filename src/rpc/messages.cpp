@@ -1,5 +1,4 @@
 // Copyright (c) 2017-2019 The Raven Core developers
-// Copyright (c) 2020-2021 The Neoxa Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -21,16 +20,13 @@
 #include "policy/feerate.h"
 #include "policy/fees.h"
 #include "policy/policy.h"
-#include "policy/rbf.h"
 #include "rpc/mining.h"
-#include "rpc/safemode.h"
 #include "rpc/server.h"
 #include "script/sign.h"
 #include "timedata.h"
 #include "util.h"
 #include "utilmoneystr.h"
 #include "wallet/coincontrol.h"
-#include "wallet/feebumper.h"
 #include "wallet/wallet.h"
 #include "wallet/walletdb.h"
 
@@ -40,7 +36,7 @@ std::string MessageActivationWarning()
 }
 
 UniValue viewallmessages(const JSONRPCRequest& request) {
-    if (request.fHelp || !AreMessagesDeployed() || request.params.size() != 0)
+    if (request.fHelp  || !AreMessagesDeployed() || request.params.size() != 0)
         throw std::runtime_error(
                 "viewallmessages \n"
                 + MessageActivationWarning() +
@@ -125,7 +121,6 @@ UniValue viewallmessagechannels(const JSONRPCRequest& request) {
     if (request.fHelp || request.params.size() != 0)
         throw std::runtime_error(
                 "viewallmessagechannels \n"
-                + MessageActivationWarning() +
                 "\nView all message channels the wallet is subscribed to\n"
 
                 "\nResult:[\n"
@@ -175,7 +170,6 @@ UniValue subscribetochannel(const JSONRPCRequest& request) {
     if (request.fHelp || request.params.size() != 1)
         throw std::runtime_error(
                 "subscribetochannel \n"
-                + MessageActivationWarning() +
                 "\nSubscribe to a certain message channel\n"
 
                 "\nArguments:\n"
@@ -222,7 +216,7 @@ UniValue subscribetochannel(const JSONRPCRequest& request) {
 
 
 UniValue unsubscribefromchannel(const JSONRPCRequest& request) {
-    if (request.fHelp || !AreMessagesDeployed() || request.params.size() != 1)
+    if (request.fHelp  || !AreMessagesDeployed() || request.params.size() != 1)
         throw std::runtime_error(
                 "unsubscribefromchannel \n"
                 + MessageActivationWarning() +
@@ -307,7 +301,7 @@ UniValue clearmessages(const JSONRPCRequest& request) {
 
 #ifdef ENABLE_WALLET
 UniValue sendmessage(const JSONRPCRequest& request) {
-    if (request.fHelp || !AreMessagesDeployed() || request.params.size() < 2 || request.params.size() > 3)
+    if (request.fHelp  || !AreMessagesDeployed() || request.params.size() < 2 || request.params.size() > 3)
         throw std::runtime_error(
                 "sendmessage \"channel_name\" \"ipfs_hash\" (expire_time)\n"
                 + MessageActivationWarning() +
@@ -331,8 +325,7 @@ UniValue sendmessage(const JSONRPCRequest& request) {
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
     }
-
-    ObserveSafeMode();
+ 
     LOCK2(cs_main, pwallet->cs_wallet);
 
     EnsureWalletIsUnlocked(pwallet);
@@ -489,16 +482,16 @@ UniValue viewmyrestrictedaddresses(const JSONRPCRequest& request) {
 static const CRPCCommand commands[] =
     {           //  category    name                          actor (function)             argNames
                 //  ----------- ------------------------      -----------------------      ----------
-            { "messages",       "viewallmessages",            &viewallmessages,            {}},
-            { "messages",       "viewallmessagechannels",     &viewallmessagechannels,     {}},
-            { "messages",       "subscribetochannel",         &subscribetochannel,         {"channel_name"}},
-            { "messages",       "unsubscribefromchannel",     &unsubscribefromchannel,     {"channel_name"}},
+            { "messages",       "viewallmessages",            &viewallmessages,            true, {}},
+            { "messages",       "viewallmessagechannels",     &viewallmessagechannels,     true, {}},
+            { "messages",       "subscribetochannel",         &subscribetochannel,         true, {"channel_name"}},
+            { "messages",       "unsubscribefromchannel",     &unsubscribefromchannel,     true, {"channel_name"}},
 #ifdef ENABLE_WALLET
-            { "messages",       "sendmessage",                &sendmessage,                {"channel", "ipfs_hash", "expire_time"}},
-            {"restricted",        "viewmytaggedaddresses",      &viewmytaggedaddresses,       {}},
-            {"restricted",        "viewmyrestrictedaddresses",  &viewmyrestrictedaddresses,   {}},
+            { "messages",       "sendmessage",                &sendmessage,                true, {"channel", "ipfs_hash", "expire_time"}},
+            {"restricted",        "viewmytaggedaddresses",      &viewmytaggedaddresses,       true,  {}},
+            {"restricted",        "viewmyrestrictedaddresses",  &viewmyrestrictedaddresses,   true, {}},
 #endif
-            { "messages",       "clearmessages",              &clearmessages,              {}},
+            { "messages",       "clearmessages",              &clearmessages,              true, {}},
     };
 
 void RegisterMessageRPCCommands(CRPCTable &t)

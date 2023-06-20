@@ -1,15 +1,17 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2016 The Bitcoin Core developers
-// Copyright (c) 2017-2021 The Raven Core developers
+// Copyright (c) 2009-2015 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef NEOXA_PRIMITIVES_BLOCK_H
-#define NEOXA_PRIMITIVES_BLOCK_H
+#ifndef BITCOIN_PRIMITIVES_BLOCK_H
+#define BITCOIN_PRIMITIVES_BLOCK_H
 
-#include "primitives/transaction.h"
-#include "serialize.h"
-#include "uint256.h"
+#include <primitives/transaction.h>
+#include <serialize.h>
+#include <uint256.h>
+#include <unordered_lru_cache.h>
+#include <util.h>
+
 
 /** Nodes collect new transactions into a block, hash them into a hash tree,
  * and scan through nonce values to make the block's hash satisfy proof-of-work
@@ -21,24 +23,12 @@
 
 extern uint32_t nKAWPOWActivationTime;
 
-class BlockNetwork
-{
-public:
-    BlockNetwork();
-    bool fOnRegtest;
-    bool fOnTestnet;
-    void SetNetwork(const std::string& network);
-};
-
-extern BlockNetwork bNetwork;
-
-
 class CBlockHeader
 {
 public:
-
     // header
     int32_t nVersion;
+
     uint256 hashPrevBlock;
     uint256 hashMerkleRoot;
     uint32_t nTime;
@@ -58,13 +48,14 @@ public:
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action) {
+    inline void SerializationOp(Stream& s, Operation ser_action) 
+    {
         READWRITE(this->nVersion);
         READWRITE(hashPrevBlock);
         READWRITE(hashMerkleRoot);
         READWRITE(nTime);
         READWRITE(nBits);
-        if (nTime < nKAWPOWActivationTime) {
+        if (nTime < 1651444217) {
             READWRITE(nNonce);
         } else {
             READWRITE(nHeight);
@@ -92,18 +83,15 @@ public:
         return (nBits == 0);
     }
 
+    /// Compute the Header Hash from the block
     uint256 GetHash() const;
     uint256 GetX16RHash() const;
-    uint256 GetX16RV2Hash() const;
+
+    /// Caching lookup/computation of POW hash
+    //uint256 GetPOWHash(bool readCache = true) const;
 
     uint256 GetHashFull(uint256& mix_hash) const;
     uint256 GetKAWPOWHeaderHash() const;
-    std::string ToString() const;
-
-    /// Use for testing algo switch
-    uint256 TestTiger() const;
-    uint256 TestSha512() const;
-    uint256 TestGost512() const;
 
     int64_t GetBlockTime() const
     {
@@ -118,9 +106,9 @@ public:
     // network and disk
     std::vector<CTransactionRef> vtx;
 
+    mutable CTxOut txoutFounder; // founder payment
     // memory only
     mutable bool fChecked;
-
 
     CBlock()
     {
@@ -136,7 +124,8 @@ public:
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action) {
+    inline void SerializationOp(Stream& s, Operation ser_action) 
+    {
         READWRITE(*(CBlockHeader*)this);
         READWRITE(vtx);
     }
@@ -146,6 +135,7 @@ public:
         CBlockHeader::SetNull();
         vtx.clear();
         fChecked = false;
+        txoutFounder = CTxOut();
     }
 
     CBlockHeader GetBlockHeader() const
@@ -158,20 +148,15 @@ public:
         block.nBits          = nBits;
         block.nNonce         = nNonce;
 
-        // KAWPOW
         block.nHeight        = nHeight;
         block.nNonce64       = nNonce64;
         block.mix_hash       = mix_hash;
         return block;
     }
 
-    // void SetPrevBlockHash(uint256 prevHash) 
-    // {
-    //     block.hashPrevBlock = prevHash;
-    // }
-
     std::string ToString() const;
 };
+
 
 /** Describes a place in the block chain to another node such that if the
  * other node doesn't have the same branch, it can find a recent common trunk.
@@ -183,12 +168,13 @@ struct CBlockLocator
 
     CBlockLocator() {}
 
-    explicit CBlockLocator(const std::vector<uint256>& vHaveIn) : vHave(vHaveIn) {}
+    CBlockLocator(const std::vector<uint256>& vHaveIn) : vHave(vHaveIn) {}
 
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action) {
+    inline void SerializationOp(Stream& s, Operation ser_action) 
+    {
         int nVersion = s.GetVersion();
         if (!(s.GetType() & SER_GETHASH))
             READWRITE(nVersion);
@@ -232,4 +218,4 @@ public:
     }
 };
 
-#endif // NEOXA_PRIMITIVES_BLOCK_H
+#endif // BITCOIN_PRIMITIVES_BLOCK_H

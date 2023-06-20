@@ -1,5 +1,8 @@
-buildspecs
-Jenkinsfile
+*.sublime-project
+*.sublime-workspace
+todo.txt
+reset-files.bash
+
 *.tar.gz
 
 *.exe
@@ -9,10 +12,9 @@ src/neoxa-cli
 src/neoxa-tx
 src/test/test_neoxa
 src/test/test_neoxa_fuzzy
-src/test/test_neoxa_hash
 src/qt/test/test_neoxa-qt
-.vscode
-output.txt
+src/qt/res/css/colors/*
+src/bench/bench_neoxa
 
 # autoreconf
 Makefile.in
@@ -41,18 +43,14 @@ src/config/stamp-h1
 share/setup.nsi
 share/qt/Info.plist
 
-
+src/univalue/gen
 
 src/qt/*.moc
 src/qt/moc_*.cpp
 src/qt/forms/ui_*.h
 
 src/qt/test/moc*.cpp
-
-.settings
-.cproject
-.project
-.vscode
+libconftest.dylib*
 
 .deps
 .dirstamp
@@ -76,6 +74,10 @@ src/qt/test/moc*.cpp
 *.json.h
 *.raw.h
 
+# Only ignore unexpected patches
+*.patch
+!depends/patches/**/*.patch
+
 #libtool object files
 *.lo
 *.la
@@ -84,7 +86,9 @@ src/qt/test/moc*.cpp
 *.qm
 Makefile
 neoxa-qt
-Neoxa-Qt.app
+neoxa-Qt.app
+background.tiff*
+!/depends/Makefile
 
 # Unit-tests
 Makefile.test
@@ -96,6 +100,7 @@ qrc_*.cpp
 # Mac specific
 .DS_Store
 build
+*.dSYM
 
 #lcov
 *.gcno
@@ -114,13 +119,35 @@ test/cache/*
 
 !src/leveldb*/Makefile
 
+.cproject
+.project
+.autotools
 /doc/doxygen/
 
 libneoxaconsensus.pc
 contrib/devtools/split-debug.sh
+src/qt/neoxa-qt.bash
+qa/pull-tester/tests-config.sh
+
+#development symlinks
+neoxa-cli
+neoxad
+neoxa-qt
+make
+
+/docker/bin
+
+# CLion
 .idea
 cmake-build-debug
 
-CMakeLists.txt
-db-4.8.30.NC/
-db4/
+depends/built
+depends/x86_64-pc-linux-gnu
+depends/sdk-sources/
+dist/
+*.conf
+.settings/language.settings.xml
+
+/neoxa.iml
+/testnet3_binary/
+/testnet4/

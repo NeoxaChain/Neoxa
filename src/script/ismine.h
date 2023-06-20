@@ -1,12 +1,10 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2016 The Bitcoin Core developers
-// Copyright (c) 2017-2019 The Raven Core developers
-// Copyright (c) 2020-2021 The Neoxa Core developers
+// Copyright (c) 2009-2015 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef NEOXA_SCRIPT_ISMINE_H
-#define NEOXA_SCRIPT_ISMINE_H
+#ifndef BITCOIN_SCRIPT_ISMINE_H
+#define BITCOIN_SCRIPT_ISMINE_H
 
 #include "script/standard.h"
 
@@ -40,4 +38,5 @@ isminetype IsMine(const CKeyStore& keystore, const CScript& scriptPubKey, SigVer
 isminetype IsMine(const CKeyStore& keystore, const CTxDestination& dest, bool& isInvalid, SigVersion = SIGVERSION_BASE);
 isminetype IsMine(const CKeyStore& keystore, const CTxDestination& dest, SigVersion = SIGVERSION_BASE);
 
-#endif // NEOXA_SCRIPT_ISMINE_H
+
+#endif // BITCOIN_SCRIPT_ISMINE_H

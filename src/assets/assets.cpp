@@ -941,6 +941,8 @@ bool CTransaction::IsNewAsset() const
 //! Make sure to call VerifyNewUniqueAsset if this call returns true
 bool CTransaction::IsNewUniqueAsset() const
 {
+    if (vout.size() < 1) return false;
+    
     // Check trailing outpoint for issue data with unique asset name
     if (!CheckIssueDataTx(vout[vout.size() - 1]))
         return false;
@@ -1142,6 +1144,8 @@ bool CTransaction::VerifyNewAsset(std::string& strError) const {
 //! Make sure to call VerifyNewUniqueAsset if this call returns true
 bool CTransaction::IsNewMsgChannelAsset() const
 {
+    if (vout.size() < 1) return false;
+
     // Check trailing outpoint for issue data with unique asset name
     if (!CheckIssueDataTx(vout[vout.size() - 1]))
         return false;
@@ -1229,6 +1233,8 @@ bool CTransaction::VerifyNewMsgChannelAsset(std::string &strError) const
 //! Make sure to call VerifyNewQualifierAsset if this call returns true
 bool CTransaction::IsNewQualifierAsset() const
 {
+    if (vout.size() < 1) return false;
+
     // Check trailing outpoint for issue data with unique asset name
     if (!CheckIssueDataTx(vout[vout.size() - 1]))
         return false;
@@ -1318,6 +1324,8 @@ bool CTransaction::VerifyNewQualfierAsset(std::string &strError) const
 //! Make sure to call VerifyNewAsset if this call returns true
 bool CTransaction::IsNewRestrictedAsset() const
 {
+    if (vout.size() < 1) return false;
+
     // Check trailing outpoint for issue data with unique asset name
     if (!CheckIssueDataTx(vout[vout.size() - 1]))
         return false;
@@ -1449,6 +1457,9 @@ bool CTransaction::GetVerifierStringFromTx(CNullAssetTxVerifierString& verifier,
 
 bool CTransaction::IsReissueAsset() const
 {
+    if (vout.size() < 1) {
+        return false;
+    }
     // Check for the reissue asset data CTxOut. This will always be the last output in the transaction
     if (!CheckReissueDataTx(vout[vout.size() - 1]))
         return false;
@@ -3125,7 +3136,7 @@ bool CheckReissueBurnTx(const CTxOut& txOut)
         return false;
 
     // Check destination address is the correct burn address
-    if (EncodeDestination(destination) != GetParams().ReissueAssetBurnAddress())
+    if (EncodeDestination(destination) != Params().ReissueAssetBurnAddress())
         return false;
 
     return true;
@@ -3611,47 +3622,47 @@ void GetAllMyAssets(CWallet* pwallet, std::vector<std::string>& names, int nMinC
 
 CAmount GetIssueAssetBurnAmount()
 {
-    return GetParams().IssueAssetBurnAmount();
+    return Params().IssueAssetBurnAmount();
 }
 
 CAmount GetReissueAssetBurnAmount()
 {
-    return GetParams().ReissueAssetBurnAmount();
+    return Params().ReissueAssetBurnAmount();
 }
 
 CAmount GetIssueSubAssetBurnAmount()
 {
-    return GetParams().IssueSubAssetBurnAmount();
+    return Params().IssueSubAssetBurnAmount();
 }
 
 CAmount GetIssueUniqueAssetBurnAmount()
 {
-    return GetParams().IssueUniqueAssetBurnAmount();
+    return Params().IssueUniqueAssetBurnAmount();
 }
 
 CAmount GetIssueMsgChannelAssetBurnAmount()
 {
-    return GetParams().IssueMsgChannelAssetBurnAmount();
+    return Params().IssueMsgChannelAssetBurnAmount();
 }
 
 CAmount GetIssueQualifierAssetBurnAmount()
 {
-    return GetParams().IssueQualifierAssetBurnAmount();
+    return Params().IssueQualifierAssetBurnAmount();
 }
 
 CAmount GetIssueSubQualifierAssetBurnAmount()
 {
-    return GetParams().IssueSubQualifierAssetBurnAmount();
+    return Params().IssueSubQualifierAssetBurnAmount();
 }
 
 CAmount GetIssueRestrictedAssetBurnAmount()
 {
-    return GetParams().IssueRestrictedAssetBurnAmount();
+    return Params().IssueRestrictedAssetBurnAmount();
 }
 
 CAmount GetAddNullQualifierTagBurnAmount()
 {
-    return GetParams().AddNullQualifierTagBurnAmount();
+    return Params().AddNullQualifierTagBurnAmount();
 }
 
 CAmount GetBurnAmount(const int nType)
@@ -3698,27 +3709,27 @@ std::string GetBurnAddress(const AssetType type)
 {
     switch (type) {
         case AssetType::ROOT:
-            return GetParams().IssueAssetBurnAddress();
+            return Params().IssueAssetBurnAddress();
         case AssetType::SUB:
-            return GetParams().IssueSubAssetBurnAddress();
+            return Params().IssueSubAssetBurnAddress();
         case AssetType::MSGCHANNEL:
-            return GetParams().IssueMsgChannelAssetBurnAddress();
+            return Params().IssueMsgChannelAssetBurnAddress();
         case AssetType::OWNER:
             return "";
         case AssetType::UNIQUE:
-            return GetParams().IssueUniqueAssetBurnAddress();
+            return Params().IssueUniqueAssetBurnAddress();
         case AssetType::VOTE:
             return "";
         case AssetType::REISSUE:
-            return GetParams().ReissueAssetBurnAddress();
+            return Params().ReissueAssetBurnAddress();
         case AssetType::QUALIFIER:
-            return GetParams().IssueQualifierAssetBurnAddress();
+            return Params().IssueQualifierAssetBurnAddress();
         case AssetType::SUB_QUALIFIER:
-            return GetParams().IssueSubQualifierAssetBurnAddress();
+            return Params().IssueSubQualifierAssetBurnAddress();
         case AssetType::RESTRICTED:
-            return GetParams().IssueRestrictedAssetBurnAddress();
+            return Params().IssueRestrictedAssetBurnAddress();
         case AssetType::NULL_ADD_QUALIFIER:
-            return GetParams().AddNullQualifierTagBurnAddress();
+            return Params().AddNullQualifierTagBurnAddress();
         default:
             return "";
     }
@@ -4191,7 +4202,7 @@ bool CreateReissueAssetTransaction(CWallet* pwallet, CCoinControl& coinControl, 
     }
 
     // Get the script for the burn address
-    CScript scriptPubKeyBurn = GetScriptForDestination(DecodeDestination(GetParams().ReissueAssetBurnAddress()));
+    CScript scriptPubKeyBurn = GetScriptForDestination(DecodeDestination(Params().ReissueAssetBurnAddress()));
 
     // Create and send the transaction
     CRecipient recipient = {scriptPubKeyBurn, burnAmount, fSubtractFeeFromAmount};
@@ -5418,7 +5429,7 @@ bool CheckReissueAsset(const CReissueAsset& asset, std::string& strError)
     /// -------- TESTNET ONLY ---------- ///
     // Testnet has a couple blocks that have invalid nReissue values before constriants were created
     bool fSkip = false;
-    if (GetParams().NetworkIDString() == CBaseChainParams::TESTNET) {
+    if (Params().NetworkIDString() == CBaseChainParams::TESTNET) {
         if (asset.strName == "GAMINGWEB" && asset.nReissuable == 109) {
             fSkip = true;
         } else if (asset.strName == "UINT8" && asset.nReissuable == -47) {

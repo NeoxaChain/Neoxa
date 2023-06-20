@@ -1,11 +1,9 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2016 The Bitcoin Core developers
-// Copyright (c) 2017-2019 The Raven Core developers
-// Copyright (c) 2020-2021 The Neoxa Core developers
+// Copyright (c) 2009-2015 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
-#ifndef NEOXA_POLICYESTIMATOR_H
-#define NEOXA_POLICYESTIMATOR_H
+#ifndef BITCOIN_POLICYESTIMATOR_H
+#define BITCOIN_POLICYESTIMATOR_H
 
 #include "amount.h"
 #include "feerate.h"
@@ -51,7 +49,7 @@ class TxConfirmStats;
  * in each bucket and the total amount of feerate paid in each bucket. Then we
  * calculate how many blocks Y it took each transaction to be mined.  We convert
  * from a number of blocks to a number of periods Y' each encompassing "scale"
- * blocks.  This is tracked in 3 different data sets each up to a maximum
+ * blocks.  This is is tracked in 3 different data sets each up to a maximum
  * number of periods. Within each data set we have an array of counters in each
  * feerate bucket and we increment all the counters from Y' up to max periods
  * representing that a tx was successfully confirmed in less than or equal to
@@ -97,9 +95,9 @@ std::string StringForFeeReason(FeeReason reason);
 
 /* Used to determine type of fee estimation requested */
 enum class FeeEstimateMode {
-    UNSET,        //!< Use default settings based on other criteria
-    ECONOMICAL,   //!< Force estimateSmartFee to use non-conservative estimates
-    CONSERVATIVE, //!< Force estimateSmartFee to use conservative estimates
+    UNSET,        //! Use default settings based on other criteria
+    ECONOMICAL,   //! Force estimateSmartFee to use non-conservative estimates
+    CONSERVATIVE, //! Force estimateSmartFee to use conservative estimates
 };
 
 bool FeeModeFromString(const std::string& mode_string, FeeEstimateMode& fee_estimate_mode);
@@ -152,11 +150,11 @@ private:
     /** Historical estimates that are older than this aren't valid */
     static const unsigned int OLDEST_ESTIMATE_HISTORY = 6 * 1008;
 
-    /** Decay of .962 is a half-life of 18 blocks or about 3 hours */
+    /** Decay of .962 is a half-life of 18 blocks or about 45 minutes */
     static constexpr double SHORT_DECAY = .962;
-    /** Decay of .998 is a half-life of 144 blocks or about 1 day */
+    /** Decay of .998 is a half-life of 144 blocks or about 6 hours */
     static constexpr double MED_DECAY = .9952;
-    /** Decay of .9995 is a half-life of 1008 blocks or about 1 week */
+    /** Decay of .9995 is a half-life of 1008 blocks or about 2 days */
     static constexpr double LONG_DECAY = .99931;
 
     /** Require greater than 60% of X feerate transactions to be confirmed within Y/2 blocks*/
@@ -275,31 +273,8 @@ private:
     unsigned int MaxUsableEstimate() const;
 };
 
-class FeeFilterRounder
-{
-private:
-    static constexpr double MAX_FILTER_FEERATE = 1e7;
-    /** FEE_FILTER_SPACING is just used to provide some quantization of fee
-     * filter results.  Historically it reused FEE_SPACING, but it is completely
-     * unrelated, and was made a separate constant so the two concepts are not
-     * tied together */
-    static constexpr double FEE_FILTER_SPACING = 1.1;
-
-public:
-    /** Create new FeeFilterRounder */
-    explicit FeeFilterRounder(const CFeeRate& minIncrementalFee);
-
-    /** Quantize a minimum fee for privacy purpose before broadcast **/
-    CAmount round(CAmount currentMinFee);
-
-private:
-    std::set<double> feeset;
-    FastRandomContext insecure_rand;
-};
-
-
 static const std::array<int, 9> confTargets = { {2, 4, 6, 12, 24, 48, 144, 504, 1008} };
 int getConfTargetForIndex(int index);
 int getIndexForConfTarget(int target);
 
-#endif /*NEOXA_POLICYESTIMATOR_H */
+#endif /*BITCOIN_POLICYESTIMATOR_H */

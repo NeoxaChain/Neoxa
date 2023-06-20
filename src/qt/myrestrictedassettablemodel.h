@@ -1,4 +1,4 @@
-#include "neoxaunits.h"
+#include "bitcoinunits.h"
 
 #include <QAbstractTableModel>
 #include <QStringList>

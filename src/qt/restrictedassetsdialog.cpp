@@ -1,13 +1,12 @@
 // Copyright (c) 2011-2016 The Bitcoin Core developers
 // Copyright (c) 2017-2019 The Raven Core developers
-// Copyright (c) 2020-2021 The Neoxa Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "restrictedassetsdialog.h"
 #include "ui_restrictedassetsdialog.h"
 
-#include "neoxaunits.h"
+#include "bitcoinunits.h"
 #include "clientmodel.h"
 #include "guiutil.h"
 #include "optionsmodel.h"
@@ -22,7 +21,6 @@
 #include "ui_interface.h"
 #include "txmempool.h"
 #include "policy/fees.h"
-#include "wallet/fees.h"
 #include "guiconstants.h"
 #include "restrictedassignqualifier.h"
 #include "ui_restrictedassignqualifier.h"
@@ -47,6 +45,8 @@
 #include <wallet/wallet.h>
 #include <wallet/coincontrol.h>
 
+#define SEND_CONFIRM_DELAY   3
+
 RestrictedAssetsDialog::RestrictedAssetsDialog(const PlatformStyle *_platformStyle, QWidget *parent) :
         QDialog(parent),
         ui(new Ui::RestrictedAssetsDialog),
@@ -70,10 +70,9 @@ void RestrictedAssetsDialog::setModel(WalletModel *_model)
     this->model = _model;
 
     if(_model && _model->getOptionsModel()) {
-        setBalance(_model->getBalance(), _model->getUnconfirmedBalance(), _model->getImmatureBalance(),
+        setBalance(_model->getBalance(), _model->getUnconfirmedBalance(), _model->getImmatureBalance(), _model->getAnonymizedBalance(),
                    _model->getWatchBalance(), _model->getWatchUnconfirmedBalance(), _model->getWatchImmatureBalance());
-        connect(_model, SIGNAL(balanceChanged(CAmount, CAmount, CAmount, CAmount, CAmount, CAmount)), this,
-                SLOT(setBalance(CAmount, CAmount, CAmount, CAmount, CAmount, CAmount)));
+        connect(_model, SIGNAL(balanceChanged(CAmount,CAmount,CAmount,CAmount,CAmount,CAmount,CAmount)), this, SLOT(setBalance(CAmount,CAmount,CAmount,CAmount,CAmount,CAmount,CAmount)));
         connect(_model->getOptionsModel(), SIGNAL(displayUnitChanged(int)), this, SLOT(updateDisplayUnit()));
         updateDisplayUnit();
 
@@ -97,6 +96,8 @@ void RestrictedAssetsDialog::setModel(WalletModel *_model)
         ui->myAddressList->horizontalHeader()->setStretchLastSection(true);
         ui->myAddressList->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
         ui->myAddressList->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+        ui->myAddressList->setSelectionBehavior(QAbstractItemView::SelectRows);
+        ui->myAddressList->setSelectionMode(QAbstractItemView::ContiguousSelection);
         ui->myAddressList->setAlternatingRowColors(true);
         ui->myAddressList->setSortingEnabled(true);
         ui->myAddressList->verticalHeader()->hide();
@@ -104,6 +105,8 @@ void RestrictedAssetsDialog::setModel(WalletModel *_model)
         ui->listAssets->setModel(assetFilterProxy);
         ui->listAssets->horizontalHeader()->setStretchLastSection(true);
         ui->listAssets->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+        ui->listAssets->setSelectionBehavior(QAbstractItemView::SelectRows);
+        ui->listAssets->setSelectionMode(QAbstractItemView::ContiguousSelection);
         ui->listAssets->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
         ui->listAssets->setAlternatingRowColors(true);
         ui->listAssets->verticalHeader()->hide();
@@ -130,23 +133,7 @@ RestrictedAssetsDialog::~RestrictedAssetsDialog()
 
 void RestrictedAssetsDialog::setupStyling(const PlatformStyle *platformStyle)
 {
-    /** Update the restrictedassets frame */
-    ui->frameAssetBalance->setStyleSheet(QString(".QFrame {background-color: %1; padding-top: 10px; padding-right: 5px; border: none;}").arg(platformStyle->WidgetBackGroundColor().name()));
-    ui->frameAddressList->setStyleSheet(QString(".QFrame {background-color: %1; padding-top: 10px; padding-right: 5px; border: none;}").arg(platformStyle->WidgetBackGroundColor().name()));
 
-    ui->tabFrame->setStyleSheet(QString(".QFrame {background-color: %1; padding-top: 10px; padding-right: 5px; border: none;}").arg(platformStyle->WidgetBackGroundColor().name()));
-
-    /** Create the shadow effects on the frames */
-    ui->frameAssetBalance->setGraphicsEffect(GUIUtil::getShadowEffect());
-    ui->frameAddressList->setGraphicsEffect(GUIUtil::getShadowEffect());
-    ui->tabFrame->setGraphicsEffect(GUIUtil::getShadowEffect());
-
-    /** Add label color and font */
-    ui->labelAssetBalance->setStyleSheet(STRING_LABEL_COLOR);
-    ui->labelAssetBalance->setFont(GUIUtil::getTopLabelFont());
-
-    ui->labelAddressList->setStyleSheet(STRING_LABEL_COLOR);
-    ui->labelAddressList->setFont(GUIUtil::getTopLabelFont());
 }
 
 
@@ -159,7 +146,7 @@ QWidget *RestrictedAssetsDialog::setupTabChain(QWidget *prev)
     return prev;
 }
 
-void RestrictedAssetsDialog::setBalance(const CAmount& balance, const CAmount& unconfirmedBalance, const CAmount& immatureBalance,
+void RestrictedAssetsDialog::setBalance(const CAmount& balance, const CAmount& unconfirmedBalance, const CAmount& immatureBalance, const CAmount& anonymizedBalance,
                                  const CAmount& watchBalance, const CAmount& watchUnconfirmedBalance, const CAmount& watchImmatureBalance)
 {
     Q_UNUSED(unconfirmedBalance);
@@ -168,18 +155,18 @@ void RestrictedAssetsDialog::setBalance(const CAmount& balance, const CAmount& u
     Q_UNUSED(watchUnconfirmedBalance);
     Q_UNUSED(watchImmatureBalance);
 
-    ui->labelBalance->setFont(GUIUtil::getSubLabelFont());
-    ui->label->setFont(GUIUtil::getSubLabelFont());
+   // ui->labelBalance->setFont(GUIUtil::getSubLabelFont());
+  //  ui->label->setFont(GUIUtil::getSubLabelFont());
 
     if(model && model->getOptionsModel())
     {
-        ui->labelBalance->setText(NeoxaUnits::formatWithUnit(model->getOptionsModel()->getDisplayUnit(), balance));
+        ui->labelBalance->setText(BitcoinUnits::formatWithUnit(model->getOptionsModel()->getDisplayUnit(), balance));
     }
 }
 
 void RestrictedAssetsDialog::updateDisplayUnit()
 {
-    setBalance(model->getBalance(), 0, 0, 0, 0, 0);
+    setBalance(model->getBalance(), 0, 0, 0, 0, 0, 0);
 }
 
 void RestrictedAssetsDialog::freezeAddressClicked()
@@ -259,9 +246,9 @@ void RestrictedAssetsDialog::freezeAddressClicked()
     }
 
     if (IsInitialBlockDownload()) {
-        GUIUtil::SyncWarningMessage syncWarning(this);
+        /*GUIUtil::SyncWarningMessage syncWarning(this);
         bool sendTransaction = syncWarning.showTransactionSyncWarningMessage();
-        if (!sendTransaction)
+        if (!sendTransaction)*/
             return;
     }
 
@@ -290,12 +277,12 @@ void RestrictedAssetsDialog::freezeAddressClicked()
     if(nRequiredFee > 0)
     {
         // append fee string if a fee is required
-        questionString.append("<hr /><span style='color:#aa0000;'>");
-        questionString.append(NeoxaUnits::formatHtmlWithUnit(model->getOptionsModel()->getDisplayUnit(), nRequiredFee));
+        questionString.append("<hr /><span style='color:#e82121;'>");
+        questionString.append(BitcoinUnits::formatHtmlWithUnit(model->getOptionsModel()->getDisplayUnit(), nRequiredFee));
         questionString.append("</span> ");
         questionString.append(tr("added as transaction fee"));
 
-        // append transaction size
+        // append transaction size       
         questionString.append(" (" + QString::number((double)GetVirtualTransactionSize(transaction) / 1000) + " kB)");
     }
 
@@ -303,13 +290,13 @@ void RestrictedAssetsDialog::freezeAddressClicked()
     questionString.append("<hr />");
     CAmount totalAmount =  nRequiredFee;
     QStringList alternativeUnits;
-    for (NeoxaUnits::Unit u : NeoxaUnits::availableUnits())
+    for (BitcoinUnits::Unit u : BitcoinUnits::availableUnits())
     {
         if(u != model->getOptionsModel()->getDisplayUnit())
-            alternativeUnits.append(NeoxaUnits::formatHtmlWithUnit(u, totalAmount));
+            alternativeUnits.append(BitcoinUnits::formatHtmlWithUnit(u, totalAmount));
     }
     questionString.append(tr("Total Amount %1")
-                                  .arg(NeoxaUnits::formatHtmlWithUnit(model->getOptionsModel()->getDisplayUnit(), totalAmount)));
+                                  .arg(BitcoinUnits::formatHtmlWithUnit(model->getOptionsModel()->getDisplayUnit(), totalAmount)));
     questionString.append(QString("<span style='font-size:10pt;font-weight:normal;'><br />(=%2)</span>")
                                   .arg(alternativeUnits.join(" " + tr("or") + "<br />")));
 
@@ -409,8 +396,8 @@ void RestrictedAssetsDialog::assignQualifierClicked()
     if(nRequiredFee > 0)
     {
         // append fee string if a fee is required
-        questionString.append("<hr /><span style='color:#aa0000;'>");
-        questionString.append(NeoxaUnits::formatHtmlWithUnit(model->getOptionsModel()->getDisplayUnit(), nRequiredFee));
+        questionString.append("<hr /><span style='color:#e82121;'>");
+        questionString.append(BitcoinUnits::formatHtmlWithUnit(model->getOptionsModel()->getDisplayUnit(), nRequiredFee));
         questionString.append("</span> ");
         questionString.append(tr("added as transaction fee"));
 
@@ -422,14 +409,14 @@ void RestrictedAssetsDialog::assignQualifierClicked()
     questionString.append("<hr />");
     CAmount totalAmount =  nRequiredFee;
     QStringList alternativeUnits;
-    for (NeoxaUnits::Unit u : NeoxaUnits::availableUnits())
+    for (BitcoinUnits::Unit u : BitcoinUnits::availableUnits())
     {
         if(u != model->getOptionsModel()->getDisplayUnit())
-            alternativeUnits.append(NeoxaUnits::formatHtmlWithUnit(u, totalAmount));
+            alternativeUnits.append(BitcoinUnits::formatHtmlWithUnit(u, totalAmount));
     }
     questionString.append(tr("Total Amount %1")
-                                  .arg(NeoxaUnits::formatHtmlWithUnit(model->getOptionsModel()->getDisplayUnit(), totalAmount)));
-    questionString.append(QString("<span style='font-size:10pt;font-weight:normal;'><br />(=%2)</span>")
+                                  .arg(BitcoinUnits::formatHtmlWithUnit(model->getOptionsModel()->getDisplayUnit(), totalAmount)));
+    questionString.append(QString("<span style='font-size:10pt;font-weight:normal;'><br />%2</span>")
                                   .arg(alternativeUnits.join(" " + tr("or") + "<br />")));
 
     QString addString = tr("Confirm adding qualifier");

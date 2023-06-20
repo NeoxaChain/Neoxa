@@ -1,12 +1,8 @@
 #!/usr/bin/env python3
 # Copyright (c) 2014-2016 The Bitcoin Core developers
-# Copyright (c) 2017-2019 The Raven Core developers
-# Copyright (c) 2020-2021 The Neoxa Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-
-"""
-Test the zapwallettxes functionality.
+"""Test the zapwallettxes functionality.
 
 - start two neoxad nodes
 - create two transactions on node 0 - one is confirmed and one is unconfirmed.
@@ -18,11 +14,14 @@ Test the zapwallettxes functionality.
   transactions are still available, but that the unconfirmed transaction has
   been zapped.
 """
+from test_framework.test_framework import BitcoinTestFramework
+from test_framework.util import (
+    assert_equal,
+    assert_raises_rpc_error,
+)
+from test_framework.mininode import wait_until
 
-from test_framework.test_framework import NeoxaTestFramework
-from test_framework.util import assert_equal, assert_raises_rpc_error, wait_until
-
-class ZapWalletTXesTest (NeoxaTestFramework):
+class ZapWalletTXesTest (BitcoinTestFramework):
     def set_test_params(self):
         self.setup_clean_chain = True
         self.num_nodes = 2
@@ -59,7 +58,8 @@ class ZapWalletTXesTest (NeoxaTestFramework):
         self.stop_node(0)
         self.start_node(0, ["-persistmempool=1", "-zapwallettxes=2"])
 
-        wait_until(lambda: self.nodes[0].getmempoolinfo()['size'] == 1, err_msg="Wait for getMempoolInfo", timeout=3)
+        wait_until(lambda: self.nodes[0].getmempoolinfo()['size'] == 1, timeout=3)
+        self.nodes[0].syncwithvalidationinterfacequeue()  # Flush mempool to wallet
 
         assert_equal(self.nodes[0].gettransaction(txid1)['txid'], txid1)
         assert_equal(self.nodes[0].gettransaction(txid2)['txid'], txid2)

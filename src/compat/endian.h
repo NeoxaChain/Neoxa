@@ -1,19 +1,17 @@
-// Copyright (c) 2014-2016 The Bitcoin Core developers
-// Copyright (c) 2017-2019 The Raven Core developers
-// Copyright (c) 2020-2021 The Neoxa Core developers
+// Copyright (c) 2014-2015 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef NEOXA_COMPAT_ENDIAN_H
-#define NEOXA_COMPAT_ENDIAN_H
+#ifndef BITCOIN_COMPAT_ENDIAN_H
+#define BITCOIN_COMPAT_ENDIAN_H
 
 #if defined(HAVE_CONFIG_H)
 #include "config/neoxa-config.h"
 #endif
 
-#include "compat/byteswap.h"
-
 #include <stdint.h>
+
+#include "compat/byteswap.h"
 
 #if defined(HAVE_ENDIAN_H)
 #include <endian.h>
@@ -110,10 +108,10 @@ inline uint64_t le64toh(uint64_t little_endian_64bits)
 #else // WORDS_BIGENDIAN
 
 #if HAVE_DECL_HTOBE16 == 0
-inline uint16_t htobe16(uint16_t host_16bits)
+/*inline uint16_t htobe16(uint16_t host_16bits)
 {
     return bswap_16(host_16bits);
-}
+} */
 #endif // HAVE_DECL_HTOBE16
 
 #if HAVE_DECL_HTOLE16 == 0
@@ -195,4 +193,4 @@ inline uint64_t le64toh(uint64_t little_endian_64bits)
 
 #endif // WORDS_BIGENDIAN
 
-#endif // NEOXA_COMPAT_ENDIAN_H
+#endif // BITCOIN_COMPAT_ENDIAN_H

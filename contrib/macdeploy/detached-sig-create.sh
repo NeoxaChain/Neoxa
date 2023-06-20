@@ -1,9 +1,9 @@
 #!/bin/sh
 # Copyright (c) 2014-2015 The Bitcoin Core developers
-# Copyright (c) 2017-2019 The Neoxa__Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+export LC_ALL=C
 set -e
 
 ROOTDIR=dist
@@ -14,7 +14,7 @@ TEMPLIST=${TEMPDIR}/signatures.txt
 OUT=signature-osx.tar.gz
 OUTROOT=osx
 
-if [ ! -n "$1" ]; then
+if [ -z "$1" ]; then
   echo "usage: $0 <codesign args>"
   echo "example: $0 -s MyIdentity"
   exit 1
@@ -23,7 +23,7 @@ fi
 rm -rf ${TEMPDIR} ${TEMPLIST}
 mkdir -p ${TEMPDIR}
 
-${CODESIGN} -f --file-list ${TEMPLIST} "$@" "${BUNDLE}"
+${CODESIGN} -f --file-list ${TEMPLIST} -o runtime "$@" "${BUNDLE}"
 
 grep -v CodeResources < "${TEMPLIST}" | while read i; do
   TARGETFILE="${BUNDLE}/`echo "${i}" | sed "s|.*${BUNDLE}/||"`"
@@ -41,7 +41,7 @@ grep CodeResources < "${TEMPLIST}" | while read i; do
   RESOURCE="${TEMPDIR}/${OUTROOT}/${TARGETFILE}"
   DIRNAME="`dirname "${RESOURCE}"`"
   mkdir -p "${DIRNAME}"
-  echo "Adding resource for: "${TARGETFILE}""
+  echo "Adding resource for: \"${TARGETFILE}\""
   cp "${i}" "${RESOURCE}"
 done
 

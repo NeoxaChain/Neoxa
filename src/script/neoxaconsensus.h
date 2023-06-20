@@ -1,16 +1,14 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2016 The Bitcoin Core developers
-// Copyright (c) 2017-2019 The Raven Core developers
-// Copyright (c) 2020-2021 The Neoxa Core developers
+// Copyright (c) 2009-2015 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef NEOXA_NEOXACONSENSUS_H
-#define NEOXA_NEOXACONSENSUS_H
+#ifndef BITCOIN_BITCOINCONSENSUS_H
+#define BITCOIN_BITCOINCONSENSUS_H
 
 #include <stdint.h>
 
-#if defined(BUILD_NEOXA_INTERNAL) && defined(HAVE_CONFIG_H)
+#if defined(BUILD_BITCOIN_INTERNAL) && defined(HAVE_CONFIG_H)
 #include "config/neoxa-config.h"
   #if defined(_WIN32)
     #if defined(DLL_EXPORT)
@@ -23,7 +21,7 @@
   #elif defined(HAVE_FUNC_ATTRIBUTE_VISIBILITY)
     #define EXPORT_SYMBOL __attribute__ ((visibility ("default")))
   #endif
-#elif defined(MSC_VER) && !defined(STATIC_LIBNEOXACONSENSUS)
+#elif defined(MSC_VER) && !defined(STATIC_LIBBITCOINCONSENSUS)
   #define EXPORT_SYMBOL __declspec(dllimport)
 #endif
 
@@ -35,7 +33,7 @@
 extern "C" {
 #endif
 
-#define NEOXACONSENSUS_API_VER 1
+#define BITCOINCONSENSUS_API_VER 0
 
 typedef enum neoxaconsensus_error_t
 {
@@ -67,9 +65,8 @@ enum
 /// the additional constraints specified by flags.
 /// If not nullptr, err will contain an error/success code for the operation
 EXPORT_SYMBOL int neoxaconsensus_verify_script(const unsigned char *scriptPubKey, unsigned int scriptPubKeyLen,
-                                                 const unsigned char *txTo        , unsigned int txToLen,
-                                                 unsigned int nIn, unsigned int flags, neoxaconsensus_error* err);
-
+                                    const unsigned char *txTo        , unsigned int txToLen,
+                                    unsigned int nIn, unsigned int flags, neoxaconsensus_error* err);
 EXPORT_SYMBOL int neoxaconsensus_verify_script_with_amount(const unsigned char *scriptPubKey, unsigned int scriptPubKeyLen, int64_t amount,
                                     const unsigned char *txTo        , unsigned int txToLen,
                                     unsigned int nIn, unsigned int flags, neoxaconsensus_error* err);
@@ -82,4 +79,4 @@ EXPORT_SYMBOL unsigned int neoxaconsensus_version();
 
 #undef EXPORT_SYMBOL
 
-#endif // NEOXA_NEOXACONSENSUS_H
+#endif // BITCOIN_BITCOINCONSENSUS_H

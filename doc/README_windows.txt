@@ -1,5 +1,5 @@
 Neoxa Core
-=============
+==========
 
 Intro
 -----
@@ -18,6 +18,6 @@ However, it downloads and stores the entire history of Neoxa transactions;
 depending on the speed of your computer and network connection, the synchronization
 process can take anywhere from a few hours to a day or more.
 
-See the neoxa wiki at:
-  https://neoxa.wiki/wiki/NEOXACOIN_Wiki
+See the Neoxa documentation at:
+  https://docs.neoxa.org
 for more help and information.

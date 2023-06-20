@@ -1,14 +1,14 @@
 #!/bin/sh
 # Copyright (c) 2014-2015 The Bitcoin Core developers
-# Copyright (c) 2017-2019 The Neoxa__Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+export LC_ALL=C
 if [ -z "$OSSLSIGNCODE" ]; then
   OSSLSIGNCODE=osslsigncode
 fi
 
-if [ ! -n "$1" ]; then
+if [ -z "$1" ]; then
   echo "usage: $0 <osslcodesign args>"
   echo "example: $0 -key codesign.key"
   exit 1

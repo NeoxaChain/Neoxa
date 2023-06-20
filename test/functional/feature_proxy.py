@@ -1,12 +1,8 @@
 #!/usr/bin/env python3
 # Copyright (c) 2015-2016 The Bitcoin Core developers
-# Copyright (c) 2017-2019 The Raven Core developers
-# Copyright (c) 2020-2021 The Neoxa Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-
-"""
-Test neoxad with different proxy configuration.
+"""Test neoxad with different proxy configuration.
 
 Test plan:
 - Start neoxad's with different proxy configurations
@@ -22,8 +18,8 @@ Test plan:
     - proxy on IPv6
 
 - Create various proxies (as threads)
-- Create NEOXADs that connect to them
-- Manipulate the NEOXADs using addnode (onetry) an observe effects
+- Create neoxads that connect to them
+- Manipulate the neoxads using addnode (onetry) an observe effects
 
 addnode connect to IPv4
 addnode connect to IPv6
@@ -33,14 +29,19 @@ addnode connect to generic DNS name
 
 import socket
 import os
+
 from test_framework.socks5 import Socks5Configuration, Socks5Command, Socks5Server, AddressType
-from test_framework.test_framework import NeoxaTestFramework
-from test_framework.util import PORT_MIN, PORT_RANGE, assert_equal
+from test_framework.test_framework import BitcoinTestFramework
+from test_framework.util import (
+    PORT_MIN,
+    PORT_RANGE,
+    assert_equal,
+)
 from test_framework.netutil import test_ipv6_local
 
 RANGE_BEGIN = PORT_MIN + 2 * PORT_RANGE  # Start after p2p and rpc ports
 
-class ProxyTest(NeoxaTestFramework):
+class ProxyTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 4
 
@@ -78,13 +79,13 @@ class ProxyTest(NeoxaTestFramework):
         # Note: proxies are not used to connect to local nodes
         # this is because the proxy to use is based on CService.GetNetwork(), which return NET_UNROUTABLE for localhost
         args = [
-            ['-listen', '-proxy=%s:%i' % self.conf1.addr, '-proxyrandomize=1'],
-            ['-listen', '-proxy=%s:%i' % self.conf1.addr, '-onion=%s:%i' % self.conf2.addr, '-proxyrandomize=0'],
-            ['-listen', '-proxy=%s:%i' % self.conf2.addr, '-proxyrandomize=1'],
+            ['-listen', '-proxy=%s:%i' % (self.conf1.addr),'-proxyrandomize=1'],
+            ['-listen', '-proxy=%s:%i' % (self.conf1.addr),'-onion=%s:%i' % (self.conf2.addr),'-proxyrandomize=0'],
+            ['-listen', '-proxy=%s:%i' % (self.conf2.addr),'-proxyrandomize=1'],
             []
             ]
         if self.have_ipv6:
-            args[3] = ['-listen', '-proxy=[%s]:%i' % self.conf3.addr, '-proxyrandomize=0', '-noonion']
+            args[3] = ['-listen', '-proxy=[%s]:%i' % (self.conf3.addr),'-proxyrandomize=0', '-noonion']
         self.add_nodes(self.num_nodes, extra_args=args)
         self.start_nodes()
 
@@ -131,12 +132,12 @@ class ProxyTest(NeoxaTestFramework):
             rv.append(cmd)
 
         # Test: outgoing DNS name connection through node
-        node.addnode("node.noumenon:8767", "onetry")
+        node.addnode("node.noumenon:8333", "onetry")
         cmd = proxies[3].queue.get()
         assert(isinstance(cmd, Socks5Command))
         assert_equal(cmd.atyp, AddressType.DOMAINNAME)
         assert_equal(cmd.addr, b"node.noumenon")
-        assert_equal(cmd.port, 8767)
+        assert_equal(cmd.port, 8333)
         if not auth:
             assert_equal(cmd.username, None)
             assert_equal(cmd.password, None)
@@ -145,7 +146,6 @@ class ProxyTest(NeoxaTestFramework):
         return rv
 
     def run_test(self):
-
         # basic -proxy
         self.node_test(self.nodes[0], [self.serv1, self.serv1, self.serv1, self.serv1], False)
 
@@ -171,28 +171,28 @@ class ProxyTest(NeoxaTestFramework):
         # test RPC getnetworkinfo
         n0 = networks_dict(self.nodes[0].getnetworkinfo())
         for net in ['ipv4','ipv6','onion']:
-            assert_equal(n0[net]['proxy'], '%s:%i' % self.conf1.addr)
+            assert_equal(n0[net]['proxy'], '%s:%i' % (self.conf1.addr))
             assert_equal(n0[net]['proxy_randomize_credentials'], True)
         assert_equal(n0['onion']['reachable'], True)
 
         n1 = networks_dict(self.nodes[1].getnetworkinfo())
         for net in ['ipv4','ipv6']:
-            assert_equal(n1[net]['proxy'], '%s:%i' % self.conf1.addr)
+            assert_equal(n1[net]['proxy'], '%s:%i' % (self.conf1.addr))
             assert_equal(n1[net]['proxy_randomize_credentials'], False)
-        assert_equal(n1['onion']['proxy'], '%s:%i' % self.conf2.addr)
+        assert_equal(n1['onion']['proxy'], '%s:%i' % (self.conf2.addr))
         assert_equal(n1['onion']['proxy_randomize_credentials'], False)
         assert_equal(n1['onion']['reachable'], True)
-        
+
         n2 = networks_dict(self.nodes[2].getnetworkinfo())
         for net in ['ipv4','ipv6','onion']:
-            assert_equal(n2[net]['proxy'], '%s:%i' % self.conf2.addr)
+            assert_equal(n2[net]['proxy'], '%s:%i' % (self.conf2.addr))
             assert_equal(n2[net]['proxy_randomize_credentials'], True)
         assert_equal(n2['onion']['reachable'], True)
 
         if self.have_ipv6:
             n3 = networks_dict(self.nodes[3].getnetworkinfo())
             for net in ['ipv4','ipv6']:
-                assert_equal(n3[net]['proxy'], '[%s]:%i' % self.conf3.addr)
+                assert_equal(n3[net]['proxy'], '[%s]:%i' % (self.conf3.addr))
                 assert_equal(n3[net]['proxy_randomize_credentials'], False)
             assert_equal(n3['onion']['reachable'], False)
 

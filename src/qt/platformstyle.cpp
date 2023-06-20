@@ -1,6 +1,4 @@
-// Copyright (c) 2015-2016 The Bitcoin Core developers
-// Copyright (c) 2017-2019 The Raven Core developers
-// Copyright (c) 2020-2021 The Neoxa Core developers
+// Copyright (c) 2015 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -15,8 +13,6 @@
 #include <QPalette>
 #include <QPixmap>
 
-bool darkModeEnabled = false;
-
 static const struct {
     const char *platformId;
     /** Show images on push buttons */
@@ -26,10 +22,10 @@ static const struct {
     /** Extra padding/spacing in transactionview */
     const bool useExtraSpacing;
 } platform_styles[] = {
-    {"macosx", false, true, true},
-    {"windows", true, true, false},
+    {"macosx", false, false, true},
+    {"windows", true, false, false},
     /* Other: linux, unix, ... */
-    {"other", true, true, false}
+    {"other", true, false, false}
 };
 static const unsigned platform_styles_count = sizeof(platform_styles)/sizeof(*platform_styles);
 
@@ -115,42 +111,12 @@ QIcon PlatformStyle::SingleColorIcon(const QString& filename) const
     return ColorizeIcon(filename, SingleColor());
 }
 
-QIcon PlatformStyle::SingleColorIconOnOff(const QString& filenameOn, const QString& filenameOff) const
-{
-    QIcon icon;
-    icon.addPixmap(QPixmap(filenameOn), QIcon::Normal, QIcon::On);
-    icon.addPixmap(QPixmap(filenameOff), QIcon::Normal, QIcon::Off);
-    return icon;
-}
-
 QIcon PlatformStyle::SingleColorIcon(const QIcon& icon) const
 {
     if (!colorizeIcons)
         return icon;
     return ColorizeIcon(icon, SingleColor());
 }
-
-QIcon PlatformStyle::SingleColorIcon(const QIcon& icon, const QColor& color) const
-{
-    if (!colorizeIcons)
-        return icon;
-    return ColorizeIcon(icon, color);
-}
-
-QIcon PlatformStyle::OrangeColorIcon(const QString& filename) const
-{
-    if (!colorizeIcons)
-        return QIcon(filename);
-    return ColorizeIcon(filename, DarkOrangeColor());
-}
-
-QIcon PlatformStyle::OrangeColorIcon(const QIcon& icon) const
-{
-    if (!colorizeIcons)
-        return icon;
-    return ColorizeIcon(icon, DarkOrangeColor());
-}
-
 
 QIcon PlatformStyle::TextColorIcon(const QString& filename) const
 {
@@ -161,113 +127,6 @@ QIcon PlatformStyle::TextColorIcon(const QIcon& icon) const
 {
     return ColorizeIcon(icon, TextColor());
 }
-
-QColor PlatformStyle::TextColor() const
-{
-    if (darkModeEnabled)
-        return COLOR_TOOLBAR_SELECTED_TEXT_DARK_MODE;
-
-    return textColor;
-}
-
-QColor PlatformStyle::ToolBarSelectedTextColor() const
-{
-    if (darkModeEnabled)
-        return COLOR_TOOLBAR_SELECTED_TEXT_DARK_MODE;
-
-    return COLOR_TOOLBAR_SELECTED_TEXT;
-}
-
-QColor PlatformStyle::ToolBarNotSelectedTextColor() const
-{
-    if (darkModeEnabled)
-        return COLOR_TOOLBAR_NOT_SELECTED_TEXT_DARK_MODE;
-
-    return COLOR_TOOLBAR_NOT_SELECTED_TEXT;
-}
-
-QColor PlatformStyle::MainBackGroundColor() const
-{
-    if (darkModeEnabled)
-        return COLOR_BLACK;
-
-    return COLOR_BACKGROUND_LIGHT;
-}
-
-QColor PlatformStyle::TopWidgetBackGroundColor() const
-{
-    if (darkModeEnabled)
-        return COLOR_PRICING_WIDGET;
-
-    return COLOR_BACKGROUND_LIGHT;
-}
-
-QColor PlatformStyle::WidgetBackGroundColor() const
-{
-    if (darkModeEnabled)
-        return COLOR_WIDGET_BACKGROUND_DARK;
-
-    return COLOR_WHITE;
-}
-
-QColor PlatformStyle::SendEntriesBackGroundColor() const
-{
-    if (darkModeEnabled)
-        return QColor(21,20,17);
-
-    return QColor("#faf9f6");
-}
-
-QColor PlatformStyle::ShadowColor() const
-{
-    if (darkModeEnabled)
-        return COLOR_SHADOW_DARK;
-
-    return COLOR_SHADOW_LIGHT;
-}
-
-QColor PlatformStyle::LightBlueColor() const
-{
-    if (darkModeEnabled)
-        return COLOR_LIGHT_BLUE_DARK;
-
-    return COLOR_LIGHT_BLUE;
-}
-
-QColor PlatformStyle::DarkBlueColor() const
-{
-    if (darkModeEnabled)
-        return COLOR_DARK_BLUE_DARK;
-
-    return COLOR_DARK_BLUE;
-}
-
-QColor PlatformStyle::LightOrangeColor() const
-{
-        return COLOR_LIGHT_ORANGE;
-}
-
-QColor PlatformStyle::DarkOrangeColor() const
-{
-    return COLOR_DARK_ORANGE;
-}
-
-QColor PlatformStyle::SingleColor() const
-{
-    if (darkModeEnabled)
-        return COLOR_ASSET_TEXT; // WHITE (black -> white)
-
-    return singleColor;
-}
-
-QColor PlatformStyle::AssetTxColor() const
-{
-    if (darkModeEnabled)
-        return COLOR_LIGHT_BLUE;
-
-    return COLOR_DARK_BLUE;
-}
-
 
 const PlatformStyle *PlatformStyle::instantiate(const QString &platformId)
 {

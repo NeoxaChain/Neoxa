@@ -1,13 +1,13 @@
-// Copyright (c) 2011-2016 The Bitcoin Core developers
-// Copyright (c) 2017-2019 The Raven Core developers
-// Copyright (c) 2020-2021 The Neoxa Core developers
+// Copyright (c) 2011-2015 The Bitcoin Core developers
+// Copyright (c) 2014-2020 The Dash Core developers
+// Copyright (c) 2020 The Neoxa developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "guiutil.h"
 
-#include "neoxaaddressvalidator.h"
-#include "neoxaunits.h"
+#include "bitcoinaddressvalidator.h"
+#include "bitcoinunits.h"
 #include "qvalidatedlineedit.h"
 #include "walletmodel.h"
 
@@ -56,23 +56,17 @@
 #include <QMouseEvent>
 #include <QPainter>
 
-#if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
+#if QT_VERSION < 0x050000
 #include <QUrl>
 #else
 #include <QUrlQuery>
 #endif
 
-#if QT_VERSION >= QT_VERSION_CHECK(5, 2, 0)
+#if QT_VERSION >= 0x50200
 #include <QFontDatabase>
 #endif
 
-#if QT_VERSION < QT_VERSION_CHECK(5, 11, 0)
-#define QTversionPreFiveEleven
-#endif
-
-#ifdef WIN32
 static fs::detail::utf8_codecvt_facet utf8;
-#endif
 
 #if defined(Q_OS_MAC)
 extern double NSAppKitVersionNumber;
@@ -84,82 +78,63 @@ extern double NSAppKitVersionNumber;
 #endif
 #endif
 
-#include <QGraphicsDropShadowEffect>
-#include "guiconstants.h"
-#include "platformstyle.h"
-
 namespace GUIUtil {
 
-QFont getSubLabelFont()
+// The theme to set by default if settings are missing or incorrect
+static const QString defaultTheme = "Dark";
+// The prefix a theme name should have if we want to apply dark colors and styles to it
+static const QString darkThemePrefix = "Dark";
+
+static const std::map<ThemedColor, QColor> themedColors = {
+    { ThemedColor::DEFAULT, QColor(0, 0, 0) },
+    { ThemedColor::UNCONFIRMED, QColor(128, 128, 128) },
+    { ThemedColor::NEGATIVE, QColor(255, 0, 0) },
+    { ThemedColor::BAREADDRESS, QColor(140, 140, 140) },
+    { ThemedColor::TX_STATUS_OPENUNTILDATE, QColor(64, 64, 255) },
+    { ThemedColor::TX_STATUS_OFFLINE, QColor(192, 192, 192) },
+    { ThemedColor::TX_STATUS_DANGER, QColor(200, 100, 100) },
+    { ThemedColor::TX_STATUS_LOCKED, QColor(0, 128, 255) },
+};
+
+static const std::map<ThemedColor, QColor> themedDarkColors = {
+    { ThemedColor::DEFAULT, QColor(170, 170, 170) },
+    { ThemedColor::UNCONFIRMED, QColor(204, 204, 204) },
+    { ThemedColor::NEGATIVE, QColor(255, 69, 0) },
+    { ThemedColor::BAREADDRESS, QColor(140, 140, 140) },
+    { ThemedColor::TX_STATUS_OPENUNTILDATE, QColor(64, 64, 255) },
+    { ThemedColor::TX_STATUS_OFFLINE, QColor(192, 192, 192) },
+    { ThemedColor::TX_STATUS_DANGER, QColor(200, 100, 100) },
+    { ThemedColor::TX_STATUS_LOCKED, QColor(0, 128, 255) },
+};
+
+static const std::map<ThemedStyle, QString> themedStyles = {
+    { ThemedStyle::TS_INVALID, "background:#FF8080;" },
+    { ThemedStyle::TS_ERROR, "color:red;" },
+    { ThemedStyle::TS_SUCCESS, "color:green;" },
+    { ThemedStyle::TS_COMMAND, "color:#006060;" },
+    { ThemedStyle::TS_PRIMARY, "color:black;" },
+    { ThemedStyle::TS_SECONDARY, "color:#808080;" },
+};
+
+static const std::map<ThemedStyle, QString> themedDarkStyles = {
+    { ThemedStyle::TS_INVALID, "background:#ff4500;" },
+    { ThemedStyle::TS_ERROR, "color:#ff4500;" },
+    { ThemedStyle::TS_SUCCESS, "color:green;" },
+    { ThemedStyle::TS_COMMAND, "color:#0cc;" },
+    { ThemedStyle::TS_PRIMARY, "color:#ccc;" },
+    { ThemedStyle::TS_SECONDARY, "color:#aaa;" },
+};
+
+QColor getThemedQColor(ThemedColor color)
 {
-    QFont labelSubFont;
-#if !defined(Q_OS_MAC)
-    labelSubFont.setFamily("Open Sans");
-#endif
-    labelSubFont.setWeight(QFont::Weight::ExtraLight);
-    labelSubFont.setLetterSpacing(QFont::SpacingType::AbsoluteSpacing, -0.6);
-    labelSubFont.setPixelSize(14);
-    return labelSubFont;
+    QString theme = QSettings().value("theme", "").toString();
+    return theme.startsWith(darkThemePrefix) ? themedDarkColors.at(color) : themedColors.at(color);
 }
 
-QFont getSubLabelFontBolded()
+QString getThemedStyleQString(ThemedStyle style)
 {
-    QFont labelSubFont;
-#if !defined(Q_OS_MAC)
-    labelSubFont.setFamily("Open Sans");
-#endif
-    labelSubFont.setWeight(QFont::Weight::Bold);
-    labelSubFont.setLetterSpacing(QFont::SpacingType::AbsoluteSpacing, -0.6);
-    labelSubFont.setPixelSize(14);
-    return labelSubFont;
-}
-
-QFont getTopLabelFontBolded()
-{
-    QFont labelTopFont;
-#if !defined(Q_OS_MAC)
-    labelTopFont.setFamily("Open Sans");
-#endif
-    labelTopFont.setWeight(QFont::Weight::Bold);
-    labelTopFont.setLetterSpacing(QFont::SpacingType::AbsoluteSpacing, -0.6);
-    labelTopFont.setPixelSize(18);
-    return labelTopFont;
-}
-
-QFont getTopLabelFont(int weight, int pxsize)
-{
-    QFont labelTopFont;
-#if !defined(Q_OS_MAC)
-    labelTopFont.setFamily("Open Sans");
-#endif
-    labelTopFont.setWeight(weight);
-    labelTopFont.setLetterSpacing(QFont::SpacingType::AbsoluteSpacing, -0.6);
-    labelTopFont.setPixelSize(pxsize);
-    return labelTopFont;
-}
-
-QFont getTopLabelFont()
-{
-    QFont labelTopFont;
-#if !defined(Q_OS_MAC)
-    labelTopFont.setFamily("Open Sans");
-#endif
-    labelTopFont.setWeight(QFont::Weight::Light);
-    labelTopFont.setLetterSpacing(QFont::SpacingType::AbsoluteSpacing, -0.6);
-    labelTopFont.setPixelSize(18);
-    return labelTopFont;
-}
-
-QGraphicsDropShadowEffect* getShadowEffect()
-{
-#if defined(Q_OS_MAC)
-    return nullptr;
-#endif
-    QGraphicsDropShadowEffect *shadow = new QGraphicsDropShadowEffect;
-    shadow->setBlurRadius(50);
-    shadow->setColor(darkModeEnabled ? COLOR_SHADOW_DARK : COLOR_SHADOW_LIGHT);
-    shadow->setOffset(8.0);
-    return shadow;
+    QString theme = QSettings().value("theme", "").toString();
+    return theme.startsWith(darkThemePrefix) ? themedDarkStyles.at(style) : themedStyles.at(style);
 }
 
 QString dateTimeStr(const QDateTime &date)
@@ -197,9 +172,8 @@ static std::string DummyAddress(const CChainParams &params)
     sourcedata.insert(sourcedata.end(), dummydata, dummydata + sizeof(dummydata));
     for(int i=0; i<256; ++i) { // Try every trailing byte
         std::string s = EncodeBase58(sourcedata.data(), sourcedata.data() + sourcedata.size());
-        if (!IsValidDestinationString(s)) {
+        if (!CBitcoinAddress(s).IsValid())
             return s;
-        }
         sourcedata[sourcedata.size()-1] += 1;
     }
     return "";
@@ -209,15 +183,15 @@ void setupAddressWidget(QValidatedLineEdit *widget, QWidget *parent)
 {
     parent->setFocusProxy(widget);
 
-    widget->setFont(getSubLabelFont());
+    widget->setFont(fixedPitchFont());
 #if QT_VERSION >= 0x040700
     // We don't want translators to use own addresses in translations
     // and this is the only place, where this address is supplied.
-    widget->setPlaceholderText(QObject::tr("Enter a neoxa address (e.g. %1)").arg(
-        QString::fromStdString(DummyAddress(GetParams()))));
+    widget->setPlaceholderText(QObject::tr("Enter a Neoxa address (e.g. %1)").arg(
+        QString::fromStdString(DummyAddress(Params()))));
 #endif
-    widget->setValidator(new NeoxaAddressEntryValidator(parent));
-    widget->setCheckValidator(new NeoxaAddressCheckValidator(parent));
+    widget->setValidator(new BitcoinAddressEntryValidator(parent));
+    widget->setCheckValidator(new BitcoinAddressCheckValidator(parent));
 }
 
 void setupAmountWidget(QLineEdit *widget, QWidget *parent)
@@ -229,7 +203,7 @@ void setupAmountWidget(QLineEdit *widget, QWidget *parent)
     widget->setAlignment(Qt::AlignRight|Qt::AlignVCenter);
 }
 
-bool parseNeoxaURI(const QUrl &uri, SendCoinsRecipient *out)
+bool parseBitcoinURI(const QUrl &uri, SendCoinsRecipient *out)
 {
     // return if URI is not valid or is no neoxa: URI
     if(!uri.isValid() || uri.scheme() != QString("neoxa"))
@@ -249,6 +223,7 @@ bool parseNeoxaURI(const QUrl &uri, SendCoinsRecipient *out)
     QUrlQuery uriQuery(uri);
     QList<QPair<QString, QString> > items = uriQuery.queryItems();
 #endif
+
     for (QList<QPair<QString, QString> >::iterator i = items.begin(); i != items.end(); i++)
     {
         bool fShouldReturnFalse = false;
@@ -263,6 +238,11 @@ bool parseNeoxaURI(const QUrl &uri, SendCoinsRecipient *out)
             rv.label = i->second;
             fShouldReturnFalse = false;
         }
+        if (i->first == "IS")
+        {
+            // we simply ignore IS
+            fShouldReturnFalse = false;
+        }
         if (i->first == "message")
         {
             rv.message = i->second;
@@ -272,7 +252,7 @@ bool parseNeoxaURI(const QUrl &uri, SendCoinsRecipient *out)
         {
             if(!i->second.isEmpty())
             {
-                if(!NeoxaUnits::parse(NeoxaUnits::NEOX, i->second, &rv.amount))
+                if(!BitcoinUnits::parse(BitcoinUnits::NEOX, i->second, &rv.amount))
                 {
                     return false;
                 }
@@ -290,7 +270,7 @@ bool parseNeoxaURI(const QUrl &uri, SendCoinsRecipient *out)
     return true;
 }
 
-bool parseNeoxaURI(QString uri, SendCoinsRecipient *out)
+bool parseBitcoinURI(QString uri, SendCoinsRecipient *out)
 {
     // Convert neoxa:// to neoxa:
     //
@@ -298,25 +278,25 @@ bool parseNeoxaURI(QString uri, SendCoinsRecipient *out)
     //    which will lower-case it (and thus invalidate the address).
     if(uri.startsWith("neoxa://", Qt::CaseInsensitive))
     {
-        uri.replace(0, 10, "neoxa:");
+        uri.replace(0, 7, "neoxa:");
     }
     QUrl uriInstance(uri);
-    return parseNeoxaURI(uriInstance, out);
+    return parseBitcoinURI(uriInstance, out);
 }
 
-QString formatNeoxaURI(const SendCoinsRecipient &info)
+QString formatBitcoinURI(const SendCoinsRecipient &info)
 {
     QString ret = QString("neoxa:%1").arg(info.address);
     int paramCount = 0;
 
     if (info.amount)
     {
-        ret += QString("?amount=%1").arg(NeoxaUnits::format(NeoxaUnits::NEOX, info.amount, false, NeoxaUnits::separatorNever));
+        ret += QString("?amount=%1").arg(BitcoinUnits::format(BitcoinUnits::NEOX, info.amount, false, BitcoinUnits::separatorNever));
         paramCount++;
     }
- 
+
     if (!info.label.isEmpty())
-    { 
+    {
         QString lbl(QUrl::toPercentEncoding(info.label));
         ret += QString("%1label=%2").arg(paramCount == 0 ? "?" : "&").arg(lbl);
         paramCount++;
@@ -334,7 +314,7 @@ QString formatNeoxaURI(const SendCoinsRecipient &info)
 
 bool isDust(const QString& address, const CAmount& amount)
 {
-    CTxDestination dest = DecodeDestination(address.toStdString());
+    CTxDestination dest = CBitcoinAddress(address.toStdString()).Get();
     CScript script = GetScriptForDestination(dest);
     CTxOut txOut(amount, script);
     return IsDust(txOut, ::dustRelayFee);
@@ -347,6 +327,7 @@ QString HtmlEscape(const QString& str, bool fMultiLine)
 #else
     QString escaped = str.toHtmlEscaped();
 #endif
+    escaped = escaped.replace(" ", "&nbsp;");
     if(fMultiLine)
     {
         escaped = escaped.replace("\n", "<br>\n");
@@ -501,13 +482,22 @@ void openDebugLogfile()
         QDesktopServices::openUrl(QUrl::fromLocalFile(boostPathToQString(pathDebug)));
 }
 
-bool openNeoxaConf()
+void openConfigfile()
 {
-    fs::path pathConfig = GetConfigFile(gArgs.GetArg("-conf", NEOXA_CONF_FILENAME));
+    fs::path pathConfig = GetConfigFile(gArgs.GetArg("-conf", BITCOIN_CONF_FILENAME));
 
     /* Open neoxa.conf with the associated application */
     if (fs::exists(pathConfig))
-        return QDesktopServices::openUrl(QUrl::fromLocalFile(boostPathToQString(pathConfig)));
+        QDesktopServices::openUrl(QUrl::fromLocalFile(boostPathToQString(pathConfig)));
+}
+
+void showBackups()
+{
+    fs::path backupsDir = GetBackupsDir();
+
+    /* Open folder with default browser */
+    if (fs::exists(backupsDir))
+        QDesktopServices::openUrl(QUrl::fromLocalFile(boostPathToQString(backupsDir)));
 }
 
 void SubstituteFonts(const QString& language)
@@ -546,26 +536,6 @@ void SubstituteFonts(const QString& language)
 #endif
 }
 
-    SyncWarningMessage::SyncWarningMessage(QWidget *parent) :
-        QDialog(parent)
-{
-
-}
-
-    bool SyncWarningMessage::showTransactionSyncWarningMessage()
-    {
-        QMessageBox::StandardButton reply;
-        reply = QMessageBox::warning(this, tr("Warning: transaction while syncing wallet!"), tr("You are trying to send a transaction while your wallet is not fully synced. This is not recommended because the transaction might get stuck in your wallet. Are you sure you want to proceed?\n\nRecommended action: Fully sync your wallet before sending a transaction.\n"),
-                                      QMessageBox::Yes|QMessageBox::No);
-
-        if (reply == QMessageBox::Yes) {
-            return true;
-        } else {
-            return false;
-        }
-    }
-
-
 ToolTipToRichTextFilter::ToolTipToRichTextFilter(int _size_threshold, QObject *parent) :
     QObject(parent),
     size_threshold(_size_threshold)
@@ -579,11 +549,14 @@ bool ToolTipToRichTextFilter::eventFilter(QObject *obj, QEvent *evt)
     {
         QWidget *widget = static_cast<QWidget*>(obj);
         QString tooltip = widget->toolTip();
-        if(tooltip.size() > size_threshold && !tooltip.startsWith("<qt") && !Qt::mightBeRichText(tooltip))
+        if(tooltip.size() > size_threshold && !tooltip.startsWith("<qt"))
         {
-            // Envelop with <qt></qt> to make sure Qt detects this as rich text
-            // Escape the current message as HTML and replace \n by <br>
-            tooltip = "<qt>" + HtmlEscape(tooltip, true) + "</qt>";
+            // Escape the current message as HTML and replace \n by <br> if it's not rich text
+            if(!Qt::mightBeRichText(tooltip))
+                tooltip = HtmlEscape(tooltip, true);
+            // Envelop with <qt></qt> to make sure Qt detects every tooltip as rich text
+            // and style='white-space:pre' to preserve line composition
+            tooltip = "<qt style='white-space:pre'>" + tooltip + "</qt>";
             widget->setToolTip(tooltip);
             return true;
         }
@@ -705,9 +678,8 @@ TableViewLastColumnResizingFixer::TableViewLastColumnResizingFixer(QTableView* t
     lastColumnIndex = columnCount - 1;
     secondToLastColumnIndex = columnCount - 2;
     tableView->horizontalHeader()->setMinimumSectionSize(allColumnsMinimumWidth);
-    setViewHeaderResizeMode(columnCount - 3, QHeaderView::ResizeToContents);
-    setViewHeaderResizeMode(secondToLastColumnIndex, QHeaderView::ResizeToContents);
-    setViewHeaderResizeMode(lastColumnIndex, QHeaderView::Stretch);
+    setViewHeaderResizeMode(secondToLastColumnIndex, QHeaderView::Interactive);
+    setViewHeaderResizeMode(lastColumnIndex, QHeaderView::Interactive);
 }
 
 #ifdef WIN32
@@ -715,15 +687,15 @@ fs::path static StartupShortcutPath()
 {
     std::string chain = ChainNameFromCommandLine();
     if (chain == CBaseChainParams::MAIN)
-        return GetSpecialFolderPath(CSIDL_STARTUP) / "Neoxa.lnk";
+        return GetSpecialFolderPath(CSIDL_STARTUP) / "Neoxa Core.lnk";
     if (chain == CBaseChainParams::TESTNET) // Remove this special case when CBaseChainParams::TESTNET = "testnet4"
-        return GetSpecialFolderPath(CSIDL_STARTUP) / "Neoxa (testnet).lnk";
-    return GetSpecialFolderPath(CSIDL_STARTUP) / strprintf("Neoxa (%s).lnk", chain);
+        return GetSpecialFolderPath(CSIDL_STARTUP) / "Neoxa Core (testnet).lnk";
+    return GetSpecialFolderPath(CSIDL_STARTUP) / strprintf("Neoxa Core (%s).lnk", chain);
 }
 
 bool GetStartOnSystemStartup()
 {
-    // check for Neoxa*.lnk
+    // check for "Neoxa Core*.lnk"
     return fs::exists(StartupShortcutPath());
 }
 
@@ -813,8 +785,8 @@ fs::path static GetAutostartFilePath()
 {
     std::string chain = ChainNameFromCommandLine();
     if (chain == CBaseChainParams::MAIN)
-        return GetAutostartDir() / "neoxa.desktop";
-    return GetAutostartDir() / strprintf("neoxa-%s.lnk", chain);
+        return GetAutostartDir() / "neoxacore.desktop";
+    return GetAutostartDir() / strprintf("neoxacore-%s.lnk", chain);
 }
 
 bool GetStartOnSystemStartup()
@@ -843,10 +815,9 @@ bool SetStartOnSystemStartup(bool fAutoStart)
     else
     {
         char pszExePath[MAX_PATH+1];
-        ssize_t r = readlink("/proc/self/exe", pszExePath, sizeof(pszExePath) - 1);
-        if (r == -1)
+        memset(pszExePath, 0, sizeof(pszExePath));
+        if (readlink("/proc/self/exe", pszExePath, sizeof(pszExePath)-1) == -1)
             return false;
-        pszExePath[r] = '\0';
 
         fs::create_directories(GetAutostartDir());
 
@@ -854,13 +825,13 @@ bool SetStartOnSystemStartup(bool fAutoStart)
         if (!optionFile.good())
             return false;
         std::string chain = ChainNameFromCommandLine();
-        // Write a neoxa.desktop file to the autostart directory:
+        // Write a neoxacore.desktop file to the autostart directory:
         optionFile << "[Desktop Entry]\n";
         optionFile << "Type=Application\n";
         if (chain == CBaseChainParams::MAIN)
-            optionFile << "Name=Neoxa\n";
+            optionFile << "Name=Neoxa Core\n";
         else
-            optionFile << strprintf("Name=Neoxa (%s)\n", chain);
+            optionFile << strprintf("Name=Neoxa Core (%s)\n", chain);
         optionFile << "Exec=" << pszExePath << strprintf(" -min -testnet=%d -regtest=%d\n", gArgs.GetBoolArg("-testnet", false), gArgs.GetBoolArg("-regtest", false));
         optionFile << "Terminal=false\n";
         optionFile << "Hidden=false\n";
@@ -881,77 +852,58 @@ bool SetStartOnSystemStartup(bool fAutoStart)
 LSSharedFileListItemRef findStartupItemInList(LSSharedFileListRef list, CFURLRef findUrl);
 LSSharedFileListItemRef findStartupItemInList(LSSharedFileListRef list, CFURLRef findUrl)
 {
+    // loop through the list of startup items and try to find the Neoxa Core app
     CFArrayRef listSnapshot = LSSharedFileListCopySnapshot(list, nullptr);
-    if (listSnapshot == nullptr) {
-        return nullptr;
-    }
-    
-    // loop through the list of startup items and try to find the neoxa app
     for(int i = 0; i < CFArrayGetCount(listSnapshot); i++) {
         LSSharedFileListItemRef item = (LSSharedFileListItemRef)CFArrayGetValueAtIndex(listSnapshot, i);
         UInt32 resolutionFlags = kLSSharedFileListNoUserInteraction | kLSSharedFileListDoNotMountVolumes;
         CFURLRef currentItemURL = nullptr;
 
 #if defined(MAC_OS_X_VERSION_MAX_ALLOWED) && MAC_OS_X_VERSION_MAX_ALLOWED >= 10100
-        if(&LSSharedFileListItemCopyResolvedURL)
-            currentItemURL = LSSharedFileListItemCopyResolvedURL(item, resolutionFlags, nullptr);
+    if(&LSSharedFileListItemCopyResolvedURL)
+        currentItemURL = LSSharedFileListItemCopyResolvedURL(item, resolutionFlags, nullptr);
 #if defined(MAC_OS_X_VERSION_MIN_REQUIRED) && MAC_OS_X_VERSION_MIN_REQUIRED < 10100
-        else
-            LSSharedFileListItemResolve(item, resolutionFlags, &currentItemURL, nullptr);
-#endif
-#else
+    else
         LSSharedFileListItemResolve(item, resolutionFlags, &currentItemURL, nullptr);
 #endif
+#else
+    LSSharedFileListItemResolve(item, resolutionFlags, &currentItemURL, nullptr);
+#endif
 
+        if(currentItemURL && CFEqual(currentItemURL, findUrl)) {
+            // found
+            CFRelease(currentItemURL);
+            return item;
+        }
         if(currentItemURL) {
-            if (CFEqual(currentItemURL, findUrl)) {
-                // found
-                CFRelease(listSnapshot);
-                CFRelease(currentItemURL);
-                return item;
-            }
             CFRelease(currentItemURL);
         }
     }
-    
-    CFRelease(listSnapshot);
     return nullptr;
 }
 
 bool GetStartOnSystemStartup()
 {
-    CFURLRef neoxaAppUrl = CFBundleCopyBundleURL(CFBundleGetMainBundle());
-    if (neoxaAppUrl == nullptr) {
-        return false;
-    }
-    
+    CFURLRef bitcoinAppUrl = CFBundleCopyBundleURL(CFBundleGetMainBundle());
     LSSharedFileListRef loginItems = LSSharedFileListCreate(nullptr, kLSSharedFileListSessionLoginItems, nullptr);
-    LSSharedFileListItemRef foundItem = findStartupItemInList(loginItems, neoxaAppUrl);
-
-    CFRelease(neoxaAppUrl);
+    LSSharedFileListItemRef foundItem = findStartupItemInList(loginItems, bitcoinAppUrl);
     return !!foundItem; // return boolified object
 }
 
 bool SetStartOnSystemStartup(bool fAutoStart)
 {
-    CFURLRef neoxaAppUrl = CFBundleCopyBundleURL(CFBundleGetMainBundle());
-    if (neoxaAppUrl == nullptr) {
-        return false;
-    }
-    
+    CFURLRef bitcoinAppUrl = CFBundleCopyBundleURL(CFBundleGetMainBundle());
     LSSharedFileListRef loginItems = LSSharedFileListCreate(nullptr, kLSSharedFileListSessionLoginItems, nullptr);
-    LSSharedFileListItemRef foundItem = findStartupItemInList(loginItems, neoxaAppUrl);
+    LSSharedFileListItemRef foundItem = findStartupItemInList(loginItems, bitcoinAppUrl);
 
     if(fAutoStart && !foundItem) {
-        // add neoxa app to startup item list
-        LSSharedFileListInsertItemURL(loginItems, kLSSharedFileListItemBeforeFirst, nullptr, nullptr, neoxaAppUrl, nullptr, nullptr);
+        // add Neoxa Core app to startup item list
+        LSSharedFileListInsertItemURL(loginItems, kLSSharedFileListItemBeforeFirst, nullptr, nullptr, bitcoinAppUrl, nullptr, nullptr);
     }
     else if(!fAutoStart && foundItem) {
         // remove item
         LSSharedFileListItemRemove(loginItems, foundItem);
     }
-    
-    CFRelease(neoxaAppUrl);
     return true;
 }
 #pragma GCC diagnostic pop
@@ -962,6 +914,39 @@ bool SetStartOnSystemStartup(bool fAutoStart) { return false; }
 
 #endif
 
+void migrateQtSettings()
+{
+    // Migration (12.1)
+    QSettings settings;
+    if(!settings.value("fMigrationDone121", false).toBool()) {
+        settings.remove("theme");
+        settings.remove("nWindowPos");
+        settings.remove("nWindowSize");
+        settings.setValue("fMigrationDone121", true);
+    }
+}
+
+// Open CSS when configured
+QString loadStyleSheet()
+{
+    QSettings settings;
+    QString theme = settings.value("theme", "").toString();
+
+    QDir themes(":themes");
+    // Make sure settings are pointing to an existent theme
+    if (theme.isEmpty() || !themes.exists(theme)) {
+        theme = defaultTheme;
+        settings.setValue("theme", theme);
+    }
+
+    QFile qFile(":themes/" + theme);
+    if (qFile.open(QFile::ReadOnly)) {
+        return QLatin1String(qFile.readAll());
+    }
+
+    return QString();
+}
+
 void setClipboard(const QString& str)
 {
     QApplication::clipboard()->setText(str, QClipboard::Clipboard);
@@ -970,20 +955,12 @@ void setClipboard(const QString& str)
 
 fs::path qstringToBoostPath(const QString &path)
 {
-#ifdef WIN32
     return fs::path(path.toStdString(), utf8);
-#else
-    return fs::path(path.toStdString());
-#endif
 }
 
 QString boostPathToQString(const fs::path &path)
 {
-#ifdef WIN32
     return QString::fromStdString(path.string(utf8));
-#else
-    return QString::fromStdString(path.string());
-#endif
 }
 
 QString formatDurationStr(int secs)
@@ -1091,18 +1068,6 @@ QString formatNiceTimeOffset(qint64 secs)
     return timeBehindText;
 }
 
-QString formatBytes(uint64_t bytes)
-{
-    if(bytes < 1024)
-        return QString(QObject::tr("%1 B")).arg(bytes);
-    if(bytes < 1024 * 1024)
-        return QString(QObject::tr("%1 KB")).arg(bytes / 1024);
-    if(bytes < 1024 * 1024 * 1024)
-        return QString(QObject::tr("%1 MB")).arg(bytes / 1024 / 1024);
-
-    return QString(QObject::tr("%1 GB")).arg(bytes / 1024 / 1024 / 1024);
-}
-
 void ClickableLabel::mouseReleaseEvent(QMouseEvent *event)
 {
     Q_EMIT clicked(event->pos());
@@ -1119,11 +1084,11 @@ void concatenate(QPainter* painter, QString& catString, int static_width, int le
     int start_name_length = catString.size();
 
     // Get the length of the dots
-    #ifndef QTversionPreFiveEleven
-    	int dots_width = painter->fontMetrics().horizontalAdvance("...");
-    #else
+    //#ifndef QTversionPreFiveEleven
+    //	int dots_width = painter->fontMetrics().horizontalAdvance("...");
+    //#else
     	int dots_width = painter->fontMetrics().width("...");
-    #endif
+    //#endif
 
     // Add the dots width to the amount width
     static_width += dots_width;
@@ -1132,11 +1097,11 @@ void concatenate(QPainter* painter, QString& catString, int static_width, int le
     while (catString.size() > 3)
     {
         // Get the text width of the current name
-        #ifndef QTversionPreFiveEleven
-        	int text_width = painter->fontMetrics().horizontalAdvance(catString);
-        #else
+        //#ifndef QTversionPreFiveEleven
+        //	int text_width = painter->fontMetrics().horizontalAdvance(catString);
+        //#else
         	int text_width = painter->fontMetrics().width(catString);
-        #endif
+       // #endif
         // Check to see if the text width is going to overlap the amount width if it doesn't break the loop
         if (left_side + text_width < right_size - static_width)
             break;

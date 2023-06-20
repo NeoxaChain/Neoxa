@@ -1,17 +1,15 @@
 // Copyright (c) 2016 The Bitcoin Core developers
-// Copyright (c) 2017-2019 The Raven Core developers
-// Copyright (c) 2020-2021 The Neoxa Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef NEOXA_CONSENSUS_VERSIONBITS
-#define NEOXA_CONSENSUS_VERSIONBITS
+#ifndef BITCOIN_CONSENSUS_VERSIONBITS
+#define BITCOIN_CONSENSUS_VERSIONBITS
 
 #include "chain.h"
 #include <map>
 
 /** What block version to use for new blocks (pre versionbits) */
-static const int32_t VERSIONBITS_LAST_OLD_BLOCK_VERSION = 5;
+static const int32_t VERSIONBITS_LAST_OLD_BLOCK_VERSION = 4;
 /** What bits to set in version for versionbits blocks */
 static const int32_t VERSIONBITS_TOP_BITS = 0x20000000UL;
 /** What bits to set in the version for versionbits blocks after assets is active */
@@ -39,6 +37,8 @@ struct VBDeploymentInfo {
     const char *name;
     /** Whether GBT clients can safely ignore this rule in simplified usage */
     bool gbt_force;
+    /** Whether to check current MN protocol or not */
+    bool check_mn_protocol;
 };
 
 struct BIP9Stats {

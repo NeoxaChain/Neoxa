@@ -1,3 +1,0 @@
-# Neoxa Roadmap
-
-

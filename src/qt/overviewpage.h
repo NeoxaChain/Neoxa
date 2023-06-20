@@ -1,15 +1,12 @@
-// Copyright (c) 2011-2016 The Bitcoin Core developers
-// Copyright (c) 2017-2019 The Raven Core developers
-// Copyright (c) 2020-2021 The Neoxa Core developers
+// Copyright (c) 2011-2015 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef NEOXA_QT_OVERVIEWPAGE_H
-#define NEOXA_QT_OVERVIEWPAGE_H
+#ifndef BITCOIN_QT_OVERVIEWPAGE_H
+#define BITCOIN_QT_OVERVIEWPAGE_H
 
 #include "amount.h"
 
-#include <QSortFilterProxyModel>
 #include <QWidget>
 #include <QMenu>
 #include <memory>
@@ -49,32 +46,39 @@ public:
     void openIPFSForAsset(const QModelIndex &index);
 
 public Q_SLOTS:
-            void setBalance(const CAmount& balance, const CAmount& unconfirmedBalance, const CAmount& immatureBalance,
-                            const CAmount& watchOnlyBalance, const CAmount& watchUnconfBalance, const CAmount& watchImmatureBalance);
+    void privateSendStatus();
+    void setBalance(const CAmount& balance, const CAmount& unconfirmedBalance, const CAmount& immatureBalance, const CAmount& anonymizedBalance,
+                    const CAmount& watchOnlyBalance, const CAmount& watchUnconfBalance, const CAmount& watchImmatureBalance);
 
-    Q_SIGNALS:
-            void transactionClicked(const QModelIndex &index);
+Q_SIGNALS:
+    void transactionClicked(const QModelIndex &index);
+    void outOfSyncWarningClicked();
+
     void assetSendClicked(const QModelIndex &index);
     void assetIssueSubClicked(const QModelIndex &index);
     void assetIssueUniqueClicked(const QModelIndex &index);
     void assetReissueClicked(const QModelIndex &index);
-    void outOfSyncWarningClicked();
 
 private:
+    QTimer *timer;
     Ui::OverviewPage *ui;
     ClientModel *clientModel;
     WalletModel *walletModel;
     CAmount currentBalance;
     CAmount currentUnconfirmedBalance;
     CAmount currentImmatureBalance;
+    CAmount currentAnonymizedBalance;
     CAmount currentWatchOnlyBalance;
     CAmount currentWatchUnconfBalance;
     CAmount currentWatchImmatureBalance;
+    int nDisplayUnit;
+    bool fShowAdvancedPSUI;
+    int cachedNumISLocks;
 
     TxViewDelegate *txdelegate;
     std::unique_ptr<TransactionFilterProxy> filter;
+    /** assets */
     std::unique_ptr<AssetFilterProxy> assetFilter;
-
     AssetViewDelegate *assetdelegate;
     QMenu *contextMenu;
     QAction *sendAction;
@@ -82,16 +86,24 @@ private:
     QAction *issueUnique;
     QAction *reissue;
     QAction *openURL;
+    QAction *copyHashAction;
+    /** assets end */
 
+    void SetupTransactionList(int nNumItems);
+    void DisablePrivateSendCompletely();
 
 private Q_SLOTS:
+    void togglePrivateSend();
     void updateDisplayUnit();
+    void updatePrivateSendProgress();
+    void updateAdvancedPSUI(bool fShowAdvancedPSUI);
     void handleTransactionClicked(const QModelIndex &index);
-    void handleAssetRightClicked(const QModelIndex &index);
     void updateAlerts(const QString &warnings);
     void updateWatchOnlyLabels(bool showWatchOnly);
     void handleOutOfSyncWarningClicks();
+    //assets
     void assetSearchChanged();
+    void handleAssetRightClicked(const QModelIndex &index);
 };
 
-#endif // NEOXA_QT_OVERVIEWPAGE_H
+#endif // BITCOIN_QT_OVERVIEWPAGE_H

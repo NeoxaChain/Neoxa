@@ -1,11 +1,11 @@
-// Copyright (c) 2019 The OLDNAMENEEDKEEP__Core developers
+// Copyright (c) 2019-2021 The Raven Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "restrictedfreezeaddress.h"
 #include "ui_restrictedfreezeaddress.h"
 
-#include "neoxaunits.h"
+#include "bitcoinunits.h"
 #include "clientmodel.h"
 #include "guiconstants.h"
 #include "guiutil.h"
@@ -34,7 +34,7 @@ FreezeAddress::FreezeAddress(const PlatformStyle *_platformStyle, QWidget *paren
     ui->lineEditAddress->installEventFilter(this);
     ui->lineEditChangeAddress->installEventFilter(this);
     ui->lineEditAssetData->installEventFilter(this);
-    connect(ui->buttonClear, SIGNAL(clicked()), this, SLOT(clear()));
+    connect(ui->buttonClear, SIGNAL(clicked()), this, SLOT(onClearButtonClicked()));
     connect(ui->buttonCheck, SIGNAL(clicked()), this, SLOT(check()));
     connect(ui->lineEditAddress, SIGNAL(textChanged(QString)), this, SLOT(dataChanged()));
     connect(ui->lineEditChangeAddress, SIGNAL(textChanged(QString)), this, SLOT(dataChanged()));
@@ -48,18 +48,6 @@ FreezeAddress::FreezeAddress(const PlatformStyle *_platformStyle, QWidget *paren
     connect(ui->radioButtonGlobalUnfreeze, SIGNAL(clicked()), this, SLOT(globalOptionSelected()));
     connect(ui->checkBoxChangeAddress, SIGNAL(stateChanged(int)), this, SLOT(dataChanged()));
     connect(ui->checkBoxChangeAddress, SIGNAL(stateChanged(int)), this, SLOT(changeAddressChanged(int)));
-
-    ui->labelRestricted->setStyleSheet(STRING_LABEL_COLOR);
-    ui->labelRestricted->setFont(GUIUtil::getTopLabelFont());
-
-    ui->labelAddress->setStyleSheet(STRING_LABEL_COLOR);
-    ui->labelAddress->setFont(GUIUtil::getTopLabelFont());
-
-    ui->labelAssetData->setStyleSheet(STRING_LABEL_COLOR);
-    ui->labelAssetData->setFont(GUIUtil::getTopLabelFont());
-
-    ui->checkBoxChangeAddress->setStyleSheet(QString(".QCheckBox{ %1; }").arg(STRING_LABEL_COLOR));
-
     ui->lineEditChangeAddress->hide();
 }
 
@@ -91,7 +79,7 @@ void FreezeAddress::setWalletModel(WalletModel *model)
 bool FreezeAddress::eventFilter(QObject* object, QEvent* event)
 {
     if((object == ui->lineEditAddress || object == ui->lineEditChangeAddress || object == ui->lineEditAssetData) && event->type() == QEvent::FocusIn) {
-        static_cast<QLineEdit*>(object)->setStyleSheet(STYLE_VALID);
+        //static_cast<QLineEdit*>(object)->setStyleSheet(STYLE_VALID);
         // bring up your custom edit
         return false; // lets the event continue to the edit
     }
@@ -112,11 +100,11 @@ void FreezeAddress::enableSubmitButton()
 
 void FreezeAddress::showWarning(QString string, bool failure)
 {
-    if (failure) {
+    /*if (failure) {
         ui->labelWarning->setStyleSheet(STRING_LABEL_COLOR_WARNING);
     } else {
         ui->labelWarning->setStyleSheet("");
-    }
+    }*/
     ui->labelWarning->setText(string);
     ui->labelWarning->show();
 }
@@ -133,9 +121,6 @@ void FreezeAddress::clear()
     ui->lineEditChangeAddress->clear();
     ui->lineEditAssetData->clear();
     ui->buttonSubmit->setDisabled(true);
-    ui->lineEditAddress->setStyleSheet(STYLE_VALID);
-    ui->lineEditChangeAddress->setStyleSheet(STYLE_VALID);
-    ui->lineEditAssetData->setStyleSheet(STYLE_VALID);
     ui->radioButtonFreezeAddress->setChecked(true);
     hideWarning();
 }
@@ -148,7 +133,7 @@ void FreezeAddress::dataChanged()
 
 void FreezeAddress::globalOptionSelected()
 {
-    ui->lineEditAddress->setStyleSheet(STYLE_VALID);
+    //ui->lineEditAddress->setStyleSheet(STYLE_VALID);
 }
 
 void FreezeAddress::changeAddressChanged(int state)
@@ -177,7 +162,7 @@ void FreezeAddress::check()
 
     bool failed = false;
     if (!IsAssetNameAnRestricted(restricted_asset.toStdString())){
-        showWarning(tr("Must have a restricteds asset selected"));
+        showWarning(tr("Must have a restricted asset selected"));
         failed = true;
     }
 
@@ -185,7 +170,7 @@ void FreezeAddress::check()
     if (isSingleAddress) {
         CTxDestination dest = DecodeDestination(strAddress);
         if (!IsValidDestination(dest)) {
-            ui->lineEditAddress->setStyleSheet(STYLE_INVALID);
+            //ui->lineEditAddress->setStyleSheet(STYLE_INVALID);
             failed = true;
         }
     }
@@ -195,7 +180,7 @@ void FreezeAddress::check()
         if (!strChangeAddress.empty()) {
             CTxDestination changeDest = DecodeDestination(strChangeAddress);
             if (!IsValidDestination(changeDest)) {
-                ui->lineEditChangeAddress->setStyleSheet(STYLE_INVALID);
+                //ui->lineEditChangeAddress->setStyleSheet(STYLE_INVALID);
                 failed = true;
             }
         }
@@ -205,7 +190,7 @@ void FreezeAddress::check()
         std::string strAssetData = ui->lineEditAssetData->text().toStdString();
 
         if (DecodeAssetData(strAssetData).empty()) {
-            ui->lineEditAssetData->setStyleSheet(STYLE_INVALID);
+            //ui->lineEditAssetData->setStyleSheet(STYLE_INVALID);
             failed = true;
         }
     }
@@ -238,3 +223,7 @@ void FreezeAddress::check()
         showWarning(tr("Unable to preform action at this time"));
     }
 };
+
+void FreezeAddress::onClearButtonClicked(){
+    clear();
+}

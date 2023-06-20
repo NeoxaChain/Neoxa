@@ -1,8 +1,8 @@
 Source: neoxa
 Section: utils
 Priority: optional
-Maintainer: Matt Corallo <matt@mattcorallo.com>
-Uploaders: Matt Corallo <matt@mattcorallo.com>
+Maintainer: Holger Schinzel <holger@neoxa.org>
+Uploaders: Holger Schinzel <holger@neoxa.org>
 Build-Depends: debhelper,
  devscripts,
  automake,
@@ -26,19 +26,19 @@ Build-Depends: debhelper,
  python,
  libzmq3-dev
 Standards-Version: 3.9.2
-Homepage: https://neoxa.net
-Vcs-Git: git://github.com/NeoxaChain/Neoxa.git
-Vcs-Browser: https://github.com/NeoxaChain/Neoxa
+Homepage: https://www.neoxa.org/
+Vcs-Git: git://github.com/The-Neoxa-Endeavor/neoxa.git
+Vcs-Browser: https://github.com/The-Neoxa-Endeavor/neoxa
 
 Package: neoxad
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: peer-to-peer network based digital currency - daemon
- Neoxa is a free open source peer-to-peer electronic cash system that
- is completely decentralized, without the need for a central server or
- trusted parties.  Users hold the crypto keys to their own money and
- transact directly with each other, with the help of a P2P network to
- check for double-spending.
+ Neoxa is an experimental new digital currency that enables instant, private
+ payments to anyone, anywhere in the world. Neoxa uses peer-to-peer
+ technology to operate with no central authority: managing transactions
+ and issuing money are carried out collectively by the network. Neoxa Core
+ is the name of the open source software which enables the use of this currency.
  .
  This package provides the daemon, neoxad, and the CLI tool
  neoxa-cli to interact with the daemon.
@@ -47,11 +47,11 @@ Package: neoxa-qt
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: peer-to-peer network based digital currency - Qt GUI
- Neoxa is a free open source peer-to-peer electronic cash system that
- is completely decentralized, without the need for a central server or
- trusted parties.  Users hold the crypto keys to their own money and
- transact directly with each other, with the help of a P2P network to
- check for double-spending.
+ Neoxa is an experimental new digital currency that enables instant, private
+ payments to anyone, anywhere in the world. Neoxa uses peer-to-peer
+ technology to operate with no central authority: managing transactions
+ and issuing money are carried out collectively by the network. Neoxa Core
+ is the name of the open source software which enables the use of this currency.
  .
  This package provides Neoxa-Qt, a GUI for Neoxa based on Qt.
 
@@ -59,11 +59,11 @@ Package: neoxa-tx
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: peer-to-peer digital currency - standalone transaction tool
- Neoxa is a free open source peer-to-peer electronic cash system that
- is completely decentralized, without the need for a central server or
- trusted parties.  Users hold the crypto keys to their own money and
- transact directly with each other, with the help of a P2P network to
- check for double-spending.
+ Neoxa is an experimental new digital currency that enables instant, private
+ payments to anyone, anywhere in the world. Neoxa uses peer-to-peer
+ technology to operate with no central authority: managing transactions
+ and issuing money are carried out collectively by the network. Neoxa Core
+ is the name of the open source software which enables the use of this currency.
  .
  This package provides neoxa-tx, a command-line transaction creation
  tool which can be used without a neoxa daemon.  Some means of

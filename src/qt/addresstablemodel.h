@@ -1,11 +1,11 @@
 // Copyright (c) 2011-2015 The Bitcoin Core developers
-// Copyright (c) 2017-2019 The Raven Core developers
-// Copyright (c) 2020-2021 The Neoxa Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef NEOXA_QT_ADDRESSTABLEMODEL_H
-#define NEOXA_QT_ADDRESSTABLEMODEL_H
+#ifndef BITCOIN_QT_ADDRESSTABLEMODEL_H
+#define BITCOIN_QT_ADDRESSTABLEMODEL_H
+
+#include "base58.h"
 
 #include <QAbstractTableModel>
 #include <QStringList>
@@ -28,7 +28,7 @@ public:
 
     enum ColumnIndex {
         Label = 0,   /**< User specified label */
-        Address = 1  /**< Neoxa address */
+        Address = 1  /**< Bitcoin address */
     };
 
     enum RoleIndex {
@@ -68,6 +68,8 @@ public:
     /* Look up label for address in address book, if not found return empty string.
      */
     QString labelForAddress(const QString &address) const;
+    QString labelForAddress(const CBitcoinAddress &address) const;
+    QString labelForDestination(const CTxDestination &dest) const;
 
     /* Look up row index of an address in the model.
        Return -1 if not found.
@@ -94,4 +96,4 @@ public Q_SLOTS:
     friend class AddressTablePriv;
 };
 
-#endif // NEOXA_QT_ADDRESSTABLEMODEL_H
+#endif // BITCOIN_QT_ADDRESSTABLEMODEL_H

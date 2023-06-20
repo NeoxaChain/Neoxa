@@ -1,11 +1,11 @@
-// Copyright (c) 2019 The OLDNAMENEEDKEEP__Core developers
+// Copyright (c) 2019 The Raven Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "restrictedassignqualifier.h"
 #include "ui_restrictedassignqualifier.h"
 
-#include "neoxaunits.h"
+#include "bitcoinunits.h"
 #include "clientmodel.h"
 #include "guiconstants.h"
 #include "guiutil.h"
@@ -34,7 +34,7 @@ AssignQualifier::AssignQualifier(const PlatformStyle *_platformStyle, QWidget *p
     ui->lineEditAddress->installEventFilter(this);
     ui->lineEditChangeAddress->installEventFilter(this);
     ui->lineEditAssetData->installEventFilter(this);
-    connect(ui->buttonClear, SIGNAL(clicked()), this, SLOT(clear()));
+    connect(ui->buttonClear, SIGNAL(clicked()), this, SLOT(onClearButtonClicked()));
     connect(ui->buttonCheck, SIGNAL(clicked()), this, SLOT(check()));
     connect(ui->lineEditAddress, SIGNAL(textChanged(QString)), this, SLOT(dataChanged()));
     connect(ui->lineEditChangeAddress, SIGNAL(textChanged(QString)), this, SLOT(dataChanged()));
@@ -43,20 +43,6 @@ AssignQualifier::AssignQualifier(const PlatformStyle *_platformStyle, QWidget *p
     connect(ui->checkBoxChangeAddress, SIGNAL(stateChanged(int)), this, SLOT(changeAddressChanged(int)));
     connect(ui->assetComboBox, SIGNAL(currentIndexChanged(int)), this, SLOT(dataChanged()));
     connect(ui->assignTypeComboBox, SIGNAL(currentIndexChanged(int)), this, SLOT(dataChanged()));
-
-    ui->labelQualifier->setStyleSheet(STRING_LABEL_COLOR);
-    ui->labelQualifier->setFont(GUIUtil::getTopLabelFont());
-
-    ui->labelAddress->setStyleSheet(STRING_LABEL_COLOR);
-    ui->labelAddress->setFont(GUIUtil::getTopLabelFont());
-
-    ui->labelAssignType->setStyleSheet(STRING_LABEL_COLOR);
-    ui->labelAssignType ->setFont(GUIUtil::getTopLabelFont());
-
-    ui->labelAssetData->setStyleSheet(STRING_LABEL_COLOR);
-    ui->labelAssetData ->setFont(GUIUtil::getTopLabelFont());
-
-    ui->checkBoxChangeAddress->setStyleSheet(QString(".QCheckBox{ %1; }").arg(STRING_LABEL_COLOR));
 
     ui->lineEditChangeAddress->hide();
 }
@@ -92,7 +78,7 @@ void AssignQualifier::setWalletModel(WalletModel *model)
 bool AssignQualifier::eventFilter(QObject* object, QEvent* event)
 {
     if((object == ui->lineEditAddress || object == ui->lineEditChangeAddress || object == ui->lineEditAssetData) && event->type() == QEvent::FocusIn) {
-        static_cast<QLineEdit*>(object)->setStyleSheet(STYLE_VALID);
+        //static_cast<QLineEdit*>(object)->setStyleSheet(STYLE_VALID);
         // bring up your custom edit
         return false; // lets the event continue to the edit
     }
@@ -113,11 +99,11 @@ void AssignQualifier::enableSubmitButton()
 
 void AssignQualifier::showWarning(QString string, bool failure)
 {
-    if (failure) {
+    /*if (failure) {
         ui->labelWarning->setStyleSheet(STRING_LABEL_COLOR_WARNING);
     } else {
         ui->labelWarning->setStyleSheet("");
-    }
+    }*/
     ui->labelWarning->setText(string);
     ui->labelWarning->show();
 }
@@ -134,9 +120,6 @@ void AssignQualifier::clear()
     ui->lineEditAssetData->clear();
     ui->lineEditChangeAddress->clear();
     ui->buttonSubmit->setDisabled(true);
-    ui->lineEditAddress->setStyleSheet(STYLE_VALID);
-    ui->lineEditChangeAddress->setStyleSheet(STYLE_VALID);
-    ui->lineEditAssetData->setStyleSheet(STYLE_VALID);
     ui->assignTypeComboBox->setCurrentIndex(0);
     hideWarning();
 }
@@ -174,7 +157,7 @@ void AssignQualifier::check()
     std::string strAddress = address.toStdString();
     CTxDestination dest = DecodeDestination(strAddress);
     if (!IsValidDestination(dest)) {
-        ui->lineEditAddress->setStyleSheet(STYLE_INVALID);
+        //ui->lineEditAddress->setStyleSheet(STYLE_INVALID);
         failed = true;
     }
 
@@ -183,7 +166,7 @@ void AssignQualifier::check()
         if (!strChangeAddress.empty()) {
             CTxDestination changeDest = DecodeDestination(strChangeAddress);
             if (!IsValidDestination(changeDest)) {
-                ui->lineEditChangeAddress->setStyleSheet(STYLE_INVALID);
+                //ui->lineEditChangeAddress->setStyleSheet(STYLE_INVALID);
                 failed = true;
             }
         }
@@ -193,7 +176,7 @@ void AssignQualifier::check()
         std::string strAssetData = ui->lineEditAssetData->text().toStdString();
 
         if (DecodeAssetData(strAssetData).empty()) {
-            ui->lineEditAssetData->setStyleSheet(STYLE_INVALID);
+            //ui->lineEditAssetData->setStyleSheet(STYLE_INVALID);
             failed = true;
         }
     }
@@ -219,3 +202,7 @@ void AssignQualifier::check()
         showWarning(tr("Unable to preform action at this time"));
     }
 };
+
+void AssignQualifier::onClearButtonClicked(){
+    clear();
+}

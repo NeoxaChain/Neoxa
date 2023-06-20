@@ -1,6 +1,4 @@
 // Copyright (c) 2016 The Bitcoin Core developers
-// Copyright (c) 2017-2019 The Raven Core developers
-// Copyright (c) 2020-2021 The Neoxa Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -23,14 +21,14 @@ static void BenchLockedPool(benchmark::State& state)
 
     std::vector<void*> addr;
     for (int x=0; x<ASIZE; ++x)
-        addr.push_back(nullptr);
+        addr.push_back(0);
     uint32_t s = 0x12345678;
     while (state.KeepRunning()) {
         for (int x=0; x<BITER; ++x) {
             int idx = s & (addr.size()-1);
             if (s & 0x80000000) {
                 b.free(addr[idx]);
-                addr[idx] = nullptr;
+                addr[idx] = 0;
             } else if(!addr[idx]) {
                 addr[idx] = b.alloc((s >> 16) & (MSIZE-1));
             }

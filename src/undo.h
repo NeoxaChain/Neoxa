@@ -1,12 +1,10 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2016 The Bitcoin Core developers
-// Copyright (c) 2017-2019 The Raven Core developers
-// Copyright (c) 2020-2021 The Neoxa Core developers
+// Copyright (c) 2009-2014 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef NEOXA_UNDO_H
-#define NEOXA_UNDO_H
+#ifndef BITCOIN_UNDO_H
+#define BITCOIN_UNDO_H
 
 #include "compressor.h" 
 #include "consensus/consensus.h"
@@ -35,7 +33,7 @@ public:
         ::Serialize(s, CTxOutCompressor(REF(txout->out)));
     }
 
-    explicit TxInUndoSerializer(const Coin* coin) : txout(coin) {}
+    TxInUndoSerializer(const Coin* coin) : txout(coin) {}
 };
 
 class TxInUndoDeserializer
@@ -59,15 +57,12 @@ public:
         ::Unserialize(s, REF(CTxOutCompressor(REF(txout->out))));
     }
 
-    explicit TxInUndoDeserializer(Coin* coin) : txout(coin) {}
+    TxInUndoDeserializer(Coin* coin) : txout(coin) {}
 };
 
 static const size_t MIN_TRANSACTION_INPUT_WEIGHT = WITNESS_SCALE_FACTOR * ::GetSerializeSize(CTxIn(), SER_NETWORK, PROTOCOL_VERSION);
-/** NEOXA START */
-// Deprecated for HIP2 implementation
-//static const size_t MAX_INPUTS_PER_BLOCK = /*fAssetsIsActive ? MAX_BLOCK_WEIGHT_HIP2 / MIN_TRANSACTION_INPUT_WEIGHT :*/ MAX_BLOCK_WEIGHT / MIN_TRANSACTION_INPUT_WEIGHT;
 
-/** NEOXA END */
+//static const size_t MAX_INPUTS_PER_BLOCK = MaxBlockSize(true) / ::GetSerializeSize(CTxIn(), SER_NETWORK, PROTOCOL_VERSION);
 
 /** Undo information for a CTransaction */
 class CTxUndo
@@ -92,7 +87,7 @@ public:
         uint64_t count = 0;
         ::Unserialize(s, COMPACTSIZE(count));
         if (fAssetsIsActive) {
-            if (count > MAX_BLOCK_WEIGHT_HIP2 / MIN_TRANSACTION_INPUT_WEIGHT) {
+            if (count > MAX_BLOCK_WEIGHT_RIP2 / MIN_TRANSACTION_INPUT_WEIGHT) {
                 throw std::ios_base::failure("Too many input undo records");
             }
         } else {
@@ -121,4 +116,4 @@ public:
     }
 };
 
-#endif // NEOXA_UNDO_H
+#endif // BITCOIN_UNDO_H

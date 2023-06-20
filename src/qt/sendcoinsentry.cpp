@@ -1,6 +1,6 @@
-// Copyright (c) 2011-2016 The Bitcoin Core developers
-// Copyright (c) 2017-2019 The Raven Core developers
-// Copyright (c) 2020-2021 The Neoxa Core developers
+// Copyright (c) 2011-2015 The Bitcoin Core developers
+// Copyright (c) 2014-2019 The Dash Core developers
+// Copyright (c) 2020 The Neoxa developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -13,10 +13,7 @@
 #include "optionsmodel.h"
 #include "platformstyle.h"
 #include "walletmodel.h"
-#include "guiconstants.h"
-#include "darkstyle.h"
 
-#include <QGraphicsDropShadowEffect>
 #include <QApplication>
 #include <QClipboard>
 
@@ -28,12 +25,6 @@ SendCoinsEntry::SendCoinsEntry(const PlatformStyle *_platformStyle, QWidget *par
 {
     ui->setupUi(this);
 
-    ui->addressBookButton->setIcon(platformStyle->SingleColorIcon(":/icons/address-book"));
-    ui->pasteButton->setIcon(platformStyle->SingleColorIcon(":/icons/editpaste"));
-    ui->deleteButton->setIcon(platformStyle->SingleColorIcon(":/icons/remove"));
-    ui->deleteButton_is->setIcon(platformStyle->SingleColorIcon(":/icons/remove"));
-    ui->deleteButton_s->setIcon(platformStyle->SingleColorIcon(":/icons/remove"));
-
     setCurrentWidget(ui->SendCoins);
 
     if (platformStyle->getUseExtraSpacing())
@@ -42,39 +33,23 @@ SendCoinsEntry::SendCoinsEntry(const PlatformStyle *_platformStyle, QWidget *par
     ui->addAsLabel->setPlaceholderText(tr("Enter a label for this address to add it to your address book"));
 #endif
 
+    // These icons are needed on Mac also!
+    ui->addressBookButton->setIcon(QIcon(":/icons/address-book"));
+    ui->pasteButton->setIcon(QIcon(":/icons/editpaste"));
+    ui->deleteButton->setIcon(QIcon(":/icons/remove"));
+    ui->deleteButton_is->setIcon(QIcon(":/icons/remove"));
+    ui->deleteButton_s->setIcon(QIcon(":/icons/remove"));
+      
     // normal neoxa address field
     GUIUtil::setupAddressWidget(ui->payTo, this);
-    // just a label for displaying neoxa address(es)
-    ui->payTo_is->setFont(GUIUtil::getSubLabelFont());
-
+    
     // Connect signals
     connect(ui->payAmount, SIGNAL(valueChanged()), this, SIGNAL(payAmountChanged()));
     connect(ui->checkboxSubtractFeeFromAmount, SIGNAL(toggled(bool)), this, SIGNAL(subtractFeeFromAmountChanged()));
     connect(ui->deleteButton, SIGNAL(clicked()), this, SLOT(deleteClicked()));
     connect(ui->deleteButton_is, SIGNAL(clicked()), this, SLOT(deleteClicked()));
     connect(ui->deleteButton_s, SIGNAL(clicked()), this, SLOT(deleteClicked()));
-
-    this->setStyleSheet(QString(".SendCoinsEntry {background-color: %1; padding-top: 10px; padding-right: 30px; border: none;}").arg(platformStyle->SendEntriesBackGroundColor().name()));
-
-    this->setGraphicsEffect(GUIUtil::getShadowEffect());
-
-    ui->payToLabel->setStyleSheet(STRING_LABEL_COLOR);
-    ui->payToLabel->setFont(GUIUtil::getSubLabelFont());
-
-    ui->labellLabel->setStyleSheet(STRING_LABEL_COLOR);
-    ui->labellLabel->setFont(GUIUtil::getSubLabelFont());
-
-    ui->amountLabel->setStyleSheet(STRING_LABEL_COLOR);
-    ui->amountLabel->setFont(GUIUtil::getSubLabelFont());
-
-    ui->messageLabel->setStyleSheet(STRING_LABEL_COLOR);
-    ui->messageLabel->setFont(GUIUtil::getSubLabelFont());
-
-    ui->checkboxSubtractFeeFromAmount->setStyleSheet(QString(".QCheckBox{ %1; }").arg(STRING_LABEL_COLOR));
-    ui->payTo->setFont(GUIUtil::getSubLabelFont());
-    ui->addAsLabel->setFont(GUIUtil::getSubLabelFont());
-    ui->payAmount->setFont(GUIUtil::getSubLabelFont());
-    ui->messageTextLabel->setFont(GUIUtil::getSubLabelFont());
+    connect(ui->useAvailableBalanceButton, SIGNAL(clicked()), this, SLOT(useAvailableBalanceClicked()));
 }
 
 SendCoinsEntry::~SendCoinsEntry()
@@ -135,7 +110,7 @@ void SendCoinsEntry::clear()
     ui->memoTextLabel_s->clear();
     ui->payAmount_s->clear();
 
-    // update the display unit, to not use the default ("NEOX")
+    // update the display unit, to not use the default ("BTC")
     updateDisplayUnit();
 }
 
@@ -144,9 +119,19 @@ void SendCoinsEntry::deleteClicked()
     Q_EMIT removeEntry(this);
 }
 
+void SendCoinsEntry::useAvailableBalanceClicked()
+{
+    Q_EMIT useAvailableBalance(this);
+}
+
+void SendCoinsEntry::checkSubtractFeeFromAmount()
+{
+    ui->checkboxSubtractFeeFromAmount->setChecked(true);
+}
+
 bool SendCoinsEntry::validate()
 {
-    if (!model) 
+    if (!model)
         return false;
 
     // Check input validity
@@ -290,4 +275,8 @@ bool SendCoinsEntry::updateLabel(const QString &address)
     }
 
     return false;
+}
+void SendCoinsEntry::setAmount(const CAmount &amount)
+{
+    ui->payAmount->setValue(amount);
 }

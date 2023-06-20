@@ -1,22 +1,18 @@
 #!/usr/bin/env python3
 # Copyright (c) 2014-2016 The Bitcoin Core developers
-# Copyright (c) 2017-2019 The Raven Core developers
-# Copyright (c) 2020-2021 The Neoxa Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-
-"""
-Test the pruning code.
+"""Test the pruning code.
 
 WARNING:
 This test uses 4GB of disk space.
 This test takes 30 mins or more (up to 2 hours)
 """
 
-import time
+from test_framework.test_framework import BitcoinTestFramework
+from test_framework.util import *
 import os
-from test_framework.test_framework import NeoxaTestFramework
-from test_framework.util import connect_nodes, sync_blocks, mine_large_block, assert_equal, assert_raises_rpc_error, assert_greater_than
+import sys
 
 MIN_BLOCKS_TO_KEEP = 288
 
@@ -27,75 +23,72 @@ TIMESTAMP_WINDOW = 2 * 60 * 60
 
 
 def calc_usage(blockdir):
-    return sum(os.path.getsize(blockdir+f) for f in os.listdir(blockdir) if os.path.isfile(blockdir+f)) / (1024. * 1024.)
+    return sum(os.path.getsize(blockdir+f) for f in os.listdir(blockdir) if os.path.isfile(os.path.join(blockdir, f))) / (1024. * 1024.)
 
-class PruneTest(NeoxaTestFramework):
+class PruneTest(BitcoinTestFramework):
     def set_test_params(self):
         self.setup_clean_chain = True
         self.num_nodes = 6
 
         # Create nodes 0 and 1 to mine.
         # Create node 2 to test pruning.
-        self.full_node_default_args = ["-maxreceivebuffer=20000","-blockmaxsize=999000", "-checkblocks=5", "-limitdescendantcount=100", "-limitdescendantsize=5000", "-limitancestorcount=100", "-limitancestorsize=5000" ]
+        self.full_node_default_args = ["-dip3params=2000:2000", "-dip8params=2000", "-maxreceivebuffer=20000","-blockmaxsize=999000", "-checkblocks=5", "-limitdescendantcount=100", "-limitdescendantsize=5000", "-limitancestorcount=100", "-limitancestorsize=5000" ]
         # Create nodes 3 and 4 to test manual pruning (they will be re-started with manual pruning later)
         # Create nodes 5 to test wallet in prune mode, but do not connect
         self.extra_args = [self.full_node_default_args,
                            self.full_node_default_args,
-                           ["-maxreceivebuffer=20000", "-prune=550"],
-                           ["-maxreceivebuffer=20000", "-blockmaxsize=999000"],
-                           ["-maxreceivebuffer=20000", "-blockmaxsize=999000"],
-                           ["-prune=550"]]
+                           ["-disablegovernance","-txindex=0","-maxreceivebuffer=20000","-prune=550"],
+                           ["-disablegovernance","-txindex=0","-maxreceivebuffer=20000","-blockmaxsize=999000"],
+                           ["-disablegovernance","-txindex=0","-maxreceivebuffer=20000","-blockmaxsize=999000"],
+                           ["-disablegovernance","-txindex=0","-prune=550"]]
 
     def setup_network(self):
         self.setup_nodes()
 
-        self.prunedir = self.options.tmpdir + "/node2/regtest/blocks/"
+        self.prunedir = os.path.join(self.nodes[2].datadir, self.chain, 'blocks', '')
 
         connect_nodes(self.nodes[0], 1)
         connect_nodes(self.nodes[1], 2)
         connect_nodes(self.nodes[2], 0)
         connect_nodes(self.nodes[0], 3)
         connect_nodes(self.nodes[0], 4)
-        sync_blocks(self.nodes[0:5])
+        self.sync_blocks(self.nodes[0:5])
 
     def setup_nodes(self):
-        self.add_nodes(self.num_nodes, self.extra_args, timewait=900)
+        self.add_nodes(self.num_nodes, self.extra_args, timewait=900, stderr=sys.stdout)
         self.start_nodes()
 
     def create_big_chain(self):
         # Start by creating some coinbases we can spend later
         self.nodes[1].generate(200)
-        sync_blocks(self.nodes[0:2])
+        self.sync_blocks(self.nodes[0:2])
         self.nodes[0].generate(150)
         # Then mine enough full blocks to create more than 550MiB of data
-        for _ in range(645):
+        for i in range(645):
             mine_large_block(self.nodes[0], self.utxo_cache_0)
 
-        sync_blocks(self.nodes[0:5])
+        self.sync_blocks(self.nodes[0:5])
 
     def test_height_min(self):
-        if not os.path.isfile(self.prunedir+"blk00000.dat"):
+        if not os.path.isfile(os.path.join(self.prunedir, "blk00000.dat")):
             raise AssertionError("blk00000.dat is missing, pruning too early")
         self.log.info("Success")
         self.log.info("Though we're already using more than 550MiB, current usage: %d" % calc_usage(self.prunedir))
         self.log.info("Mining 25 more blocks should cause the first block file to be pruned")
         # Pruning doesn't run until we're allocating another chunk, 20 full blocks past the height cutoff will ensure this
-        for _ in range(25):
+        for i in range(25):
             mine_large_block(self.nodes[0], self.utxo_cache_0)
 
-        wait_start = time.time()
-        while os.path.isfile(self.prunedir+"blk00000.dat"):
-            time.sleep(0.1)
-            if time.time() - wait_start > 30:
-                raise AssertionError("blk00000.dat not pruned when it should be")
+        # Wait for blk00000.dat to be pruned
+        wait_until(lambda: not os.path.isfile(os.path.join(self.prunedir, "blk00000.dat")), timeout=30)
 
         self.log.info("Success")
         usage = calc_usage(self.prunedir)
         self.log.info("Usage should be below target: %d" % usage)
-        if usage > 550:
+        if (usage > 550):
             raise AssertionError("Pruning target not being met")
 
-    def create_chain_with_stale_blocks(self):
+    def create_chain_with_staleblocks(self):
         # Create stale blocks in manageable sized chunks
         self.log.info("Mine 24 (stale) blocks on Node 1, followed by 25 (main chain) block reorg from Node 0, for 12 rounds")
 
@@ -106,23 +99,23 @@ class PruneTest(NeoxaTestFramework):
             self.stop_node(0)
             self.start_node(0, extra_args=self.full_node_default_args)
             # Mine 24 blocks in node 1
-            for _ in range(24):
+            for i in range(24):
                 if j == 0:
                     mine_large_block(self.nodes[1], self.utxo_cache_1)
                 else:
                     # Add node1's wallet transactions back to the mempool, to
                     # avoid the mined blocks from being too small.
                     self.nodes[1].resendwallettransactions()
-                    self.nodes[1].generate(1) # tx's already in mempool from previous disconnects
+                    self.nodes[1].generate(1) #tx's already in mempool from previous disconnects
 
             # Reorg back with 25 block chain from node 0
-            for _ in range(25):
+            for i in range(25):
                 mine_large_block(self.nodes[0], self.utxo_cache_0)
 
             # Create connections in the order so both nodes can see the reorg at the same time
             connect_nodes(self.nodes[1], 0)
             connect_nodes(self.nodes[2], 0)
-            sync_blocks(self.nodes[0:3])
+            self.sync_blocks(self.nodes[0:3])
 
         self.log.info("Usage can be over target because of high stale rate: %d" % calc_usage(self.prunedir))
 
@@ -132,38 +125,40 @@ class PruneTest(NeoxaTestFramework):
         # Reboot node 1 to clear its mempool (hopefully make the invalidate faster)
         # Lower the block max size so we don't keep mining all our big mempool transactions (from disconnected blocks)
         self.stop_node(1)
-        self.start_node(1, extra_args=["-maxreceivebuffer=20000","-blockmaxsize=5000", "-checkblocks=5", "-disablesafemode"])
+        self.start_node(1, extra_args=["-dip3params=2000:2000", "-dip8params=2000", "-maxreceivebuffer=20000","-blockmaxsize=5000", "-checkblocks=5"])
 
         height = self.nodes[1].getblockcount()
         self.log.info("Current block height: %d" % height)
 
-        invalid_height = height-287
-        bad_hash = self.nodes[1].getblockhash(invalid_height)
-        self.log.info("Invalidating block %s at height %d" % (bad_hash,invalid_height))
-        self.nodes[1].invalidateblock(bad_hash)
+        invalidheight = height-287
+        badhash = self.nodes[1].getblockhash(invalidheight)
+        self.log.info("Invalidating block %s at height %d" % (badhash,invalidheight))
+        self.nodes[1].invalidateblock(badhash)
 
         # We've now switched to our previously mined-24 block fork on node 1, but that's not what we want
         # So invalidate that fork as well, until we're on the same chain as node 0/2 (but at an ancestor 288 blocks ago)
-        mainchainhash = self.nodes[0].getblockhash(invalid_height - 1)
-        current_hash = self.nodes[1].getblockhash(invalid_height - 1)
-        while current_hash != mainchainhash:
-            self.nodes[1].invalidateblock(current_hash)
-            current_hash = self.nodes[1].getblockhash(invalid_height - 1)
+        mainchainhash = self.nodes[0].getblockhash(invalidheight - 1)
+        curhash = self.nodes[1].getblockhash(invalidheight - 1)
+        while curhash != mainchainhash:
+            self.nodes[1].invalidateblock(curhash)
+            curhash = self.nodes[1].getblockhash(invalidheight - 1)
 
-        assert(self.nodes[1].getblockcount() == invalid_height - 1)
+        assert(self.nodes[1].getblockcount() == invalidheight - 1)
         self.log.info("New best height: %d" % self.nodes[1].getblockcount())
 
+        # Mine one block to avoid automatic recovery from forks on restart
+        self.nodes[1].generate(1)
         # Reboot node1 to clear those giant tx's from mempool
         self.stop_node(1)
-        self.start_node(1, extra_args=["-maxreceivebuffer=20000","-blockmaxsize=5000", "-checkblocks=5", "-disablesafemode"])
+        self.start_node(1, extra_args=["-dip3params=2000:2000", "-dip8params=2000", "-maxreceivebuffer=20000","-blockmaxsize=5000", "-checkblocks=5"])
 
         self.log.info("Generating new longer chain of 300 more blocks")
-        self.nodes[1].generate(300)
+        self.nodes[1].generate(299)
 
         self.log.info("Reconnect nodes")
         connect_nodes(self.nodes[0], 1)
         connect_nodes(self.nodes[2], 1)
-        sync_blocks(self.nodes[0:3], timeout=120)
+        self.sync_blocks(self.nodes[0:3], timeout=120)
 
         self.log.info("Verify height on node 2: %d" % self.nodes[2].getblockcount())
         self.log.info("Usage possibly still high bc of stale blocks in block files: %d" % calc_usage(self.prunedir))
@@ -174,39 +169,39 @@ class PruneTest(NeoxaTestFramework):
         # mined blocks from being too small.
         self.nodes[0].resendwallettransactions()
 
-        for _ in range(22):
+        for i in range(22):
             # This can be slow, so do this in multiple RPC calls to avoid
             # RPC timeouts.
             self.nodes[0].generate(10) #node 0 has many large tx's in its mempool from the disconnects
-        sync_blocks(self.nodes[0:3], timeout=300)
+        self.sync_blocks(self.nodes[0:3], timeout=300)
 
         usage = calc_usage(self.prunedir)
         self.log.info("Usage should be below target: %d" % usage)
-        if usage > 550:
+        if (usage > 550):
             raise AssertionError("Pruning target not being met")
 
-        return invalid_height,bad_hash
+        return invalidheight,badhash
 
     def reorg_back(self):
         # Verify that a block on the old main chain fork has been pruned away
         assert_raises_rpc_error(-1, "Block not available (pruned data)", self.nodes[2].getblock, self.forkhash)
-        self.log.info("Will need to re-download block %d" % self.forkheight)
+        self.log.info("Will need to redownload block %d" % self.forkheight)
 
         # Verify that we have enough history to reorg back to the fork point
         # Although this is more than 288 blocks, because this chain was written more recently
-        # and only its other 299 small and 220 large block are in the block files after it,
-        # its expected to still be retained
+        # and only its other 299 small and 220 large blocks are in the block files after it,
+        # it is expected to still be retained
         self.nodes[2].getblock(self.nodes[2].getblockhash(self.forkheight))
 
         first_reorg_height = self.nodes[2].getblockcount()
-        current_chain_hash = self.nodes[2].getblockhash(self.mainchainheight)
-        self.nodes[2].invalidateblock(current_chain_hash)
-        goal_best_height = self.mainchainheight
-        goal_best_hash = self.mainchainhash2
+        curchainhash = self.nodes[2].getblockhash(self.mainchainheight)
+        self.nodes[2].invalidateblock(curchainhash)
+        goalbestheight = self.mainchainheight
+        goalbesthash = self.mainchainhash2
 
         # As of 0.10 the current block download logic is not able to reorg to the original chain created in
         # create_chain_with_stale_blocks because it doesn't know of any peer that's on that chain from which to
-        # re-download its missing blocks.
+        # redownload its missing blocks.
         # Invalidate the reorg_test chain in node 0 as well, it can successfully switch to the original chain
         # because it has all the block data.
         # However it must mine enough blocks to have a more work chain than the reorg_test chain in order
@@ -214,33 +209,30 @@ class PruneTest(NeoxaTestFramework):
         # At this point node 2 is within 288 blocks of the fork point so it will preserve its ability to reorg
         if self.nodes[2].getblockcount() < self.mainchainheight:
             blocks_to_mine = first_reorg_height + 1 - self.mainchainheight
-            self.log.info("Rewind node 0 to prev main chain to mine longer chain to trigger re-download. Blocks needed: %d" % blocks_to_mine)
-            self.nodes[0].invalidateblock(current_chain_hash)
+            self.log.info("Rewind node 0 to prev main chain to mine longer chain to trigger redownload. Blocks needed: %d" % blocks_to_mine)
+            self.nodes[0].invalidateblock(curchainhash)
             assert(self.nodes[0].getblockcount() == self.mainchainheight)
             assert(self.nodes[0].getbestblockhash() == self.mainchainhash2)
-            goal_best_hash = self.nodes[0].generate(blocks_to_mine)[-1]
-            goal_best_height = first_reorg_height + 1
+            goalbesthash = self.nodes[0].generate(blocks_to_mine)[-1]
+            goalbestheight = first_reorg_height + 1
 
-        self.log.info("Verify node 2 reorged back to the main chain, some blocks of which it had to re-download")
-        wait_start = time.time()
-        while self.nodes[2].getblockcount() < goal_best_height:
-            time.sleep(0.1)
-            if time.time() - wait_start > 900:
-                raise AssertionError("Node 2 didn't reorg to proper height")
-        assert(self.nodes[2].getbestblockhash() == goal_best_hash)
+        self.log.info("Verify node 2 reorged back to the main chain, some blocks of which it had to redownload")
+        # Wait for Node 2 to reorg to proper height
+        wait_until(lambda: self.nodes[2].getblockcount() >= goalbestheight, timeout=900)
+        assert(self.nodes[2].getbestblockhash() == goalbesthash)
         # Verify we can now have the data for a block previously pruned
         assert(self.nodes[2].getblock(self.forkhash)["height"] == self.forkheight)
 
     def manual_test(self, node_number, use_timestamp):
         # at this point, node has 995 blocks and has not yet run in prune mode
-        self.start_node(node_number)
+        self.start_node(node_number, extra_args=["-dip3params=2000:2000", "-dip8params=2000", "-disablegovernance", "-txindex=0"])
         node = self.nodes[node_number]
         assert_equal(node.getblockcount(), 995)
         assert_raises_rpc_error(-1, "not in prune mode", node.pruneblockchain, 500)
 
         # now re-start in manual pruning mode
         self.stop_node(node_number)
-        self.start_node(node_number, extra_args=["-prune=1"])
+        self.start_node(node_number, extra_args=["-dip3params=2000:2000", "-dip8params=2000", "-disablegovernance", "-txindex=0", "-prune=1"])
         node = self.nodes[node_number]
         assert_equal(node.getblockcount(), 995)
 
@@ -266,14 +258,21 @@ class PruneTest(NeoxaTestFramework):
                 assert_equal(ret, expected_ret)
 
         def has_block(index):
-            return os.path.isfile(self.options.tmpdir + "/node{}/regtest/blocks/blk{:05}.dat".format(node_number, index))
+            return os.path.isfile(os.path.join(self.nodes[node_number].datadir, self.chain, "blocks", "blk{:05}.dat".format(index)))
 
         # should not prune because chain tip of node 3 (995) < PruneAfterHeight (1000)
         assert_raises_rpc_error(-1, "Blockchain is too short for pruning", node.pruneblockchain, height(500))
 
+        # Save block transaction count before pruning, assert value
+        block1_details = node.getblock(node.getblockhash(1))
+        assert_equal(block1_details["nTx"], len(block1_details["tx"]))
+
         # mine 6 blocks so we are at height 1001 (i.e., above PruneAfterHeight)
         node.generate(6)
         assert_equal(node.getblockchaininfo()["blocks"], 1001)
+
+        # Pruned block should still know the number of transactions
+        assert_equal(node.getblockheader(node.getblockhash(1))["nTx"], block1_details["nTx"])
 
         # negative heights should raise an exception
         assert_raises_rpc_error(-8, "Negative", node.pruneblockchain, -10)
@@ -315,7 +314,7 @@ class PruneTest(NeoxaTestFramework):
 
         # stop node, start back up with auto-prune at 550MB, make sure still runs
         self.stop_node(node_number)
-        self.start_node(node_number, extra_args=["-prune=550"])
+        self.start_node(node_number, extra_args=["-disablegovernance", "-txindex=0", "-prune=550"])
 
         self.log.info("Success")
 
@@ -323,7 +322,7 @@ class PruneTest(NeoxaTestFramework):
         # check that the pruning node's wallet is still in good shape
         self.log.info("Stop and start pruning node to trigger wallet rescan")
         self.stop_node(2)
-        self.start_node(2, extra_args=["-prune=550"])
+        self.start_node(2, extra_args=["-disablegovernance", "-txindex=0", "-prune=550"])
         self.log.info("Success")
 
         # check that wallet loads successfully when restarting a pruned node after IBD.
@@ -331,9 +330,9 @@ class PruneTest(NeoxaTestFramework):
         self.log.info("Syncing node 5 to test wallet")
         connect_nodes(self.nodes[0], 5)
         nds = [self.nodes[0], self.nodes[5]]
-        sync_blocks(nds, wait=5, timeout=300)
+        self.sync_blocks(nds, wait=5, timeout=300)
         self.stop_node(5) #stop and start to trigger rescan
-        self.start_node(5, extra_args=["-prune=550"])
+        self.start_node(5, extra_args=["-disablegovernance", "-txindex=0", "-prune=550"])
         self.log.info("Success")
 
     def run_test(self):
@@ -367,7 +366,7 @@ class PruneTest(NeoxaTestFramework):
         # N0=N1=N2 **...*(1020)
 
         self.log.info("Check that we'll exceed disk space target if we have a very high stale block rate")
-        self.create_chain_with_stale_blocks()
+        self.create_chain_with_staleblocks()
         # Disconnect N0
         # And mine a 24 block chain on N1 and a separate 25 block chain on N0
         # N1=N2 **...*+...+(1044)
@@ -423,11 +422,11 @@ class PruneTest(NeoxaTestFramework):
         #                                 \
         #                                  *...**(1320)
 
-        self.log.info("Test that we can re-request a block we previously pruned if needed for a reorg")
+        self.log.info("Test that we can rerequest a block we previously pruned if needed for a reorg")
         self.reorg_back()
         # Verify that N2 still has block 1033 on current chain (@), but not on main chain (*)
         # Invalidate 1033 on current chain (@) on N2 and we should be able to reorg to
-        # original main chain (*), but will require re-download of some blocks
+        # original main chain (*), but will require redownload of some blocks
         # In order to have a peer we think we can download from, must also perform this invalidation
         # on N0 and mine a new longest chain to trigger.
         # Final result:

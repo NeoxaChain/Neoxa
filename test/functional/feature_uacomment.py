@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 # Copyright (c) 2017 The Bitcoin Core developers
-# Copyright (c) 2017-2019 The Raven Core developers
-# Copyright (c) 2020-2021 The Neoxa Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-
 """Test the -uacomment option."""
 
-from test_framework.test_framework import NeoxaTestFramework
+import re
+
+from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal
 
-class UacommentTest(NeoxaTestFramework):
+
+class UacommentTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 1
         self.setup_clean_chain = True
@@ -26,13 +26,14 @@ class UacommentTest(NeoxaTestFramework):
 
         self.log.info("test -uacomment max length")
         self.stop_node(0)
-        expected = "Total length of network version string (286) exceeds maximum length (256). Reduce the number or size of uacomments."
-        self.assert_start_raises_init_error(0, ["-uacomment=" + 'a' * 256], expected)
+        expected = "Error: Total length of network version string \([0-9]+\) exceeds maximum length \(256\). Reduce the number or size of uacomments."
+        self.nodes[0].assert_start_raises_init_error(["-uacomment=" + 'a' * 256], expected)
 
         self.log.info("test -uacomment unsafe characters")
         for unsafe_char in ['/', ':', '(', ')']:
-            expected = "User Agent comment (" + unsafe_char + ") contains unsafe characters"
-            self.assert_start_raises_init_error(0, ["-uacomment=" + unsafe_char], expected)
+            expected = "Error: User Agent comment \(" + re.escape(unsafe_char) + "\) contains unsafe characters."
+            self.nodes[0].assert_start_raises_init_error(["-uacomment=" + unsafe_char], expected)
+
 
 if __name__ == '__main__':
     UacommentTest().main()

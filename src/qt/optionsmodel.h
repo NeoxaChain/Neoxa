@@ -1,11 +1,9 @@
-// Copyright (c) 2011-2016 The Bitcoin Core developers
-// Copyright (c) 2017-2019 The Raven Core developers
-// Copyright (c) 2020-2021 The Neoxa Core developers
+// Copyright (c) 2011-2015 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef NEOXA_QT_OPTIONSMODEL_H
-#define NEOXA_QT_OPTIONSMODEL_H
+#ifndef BITCOIN_QT_OPTIONSMODEL_H
+#define BITCOIN_QT_OPTIONSMODEL_H
 
 #include "amount.h"
 
@@ -15,7 +13,7 @@ QT_BEGIN_NAMESPACE
 class QNetworkProxy;
 QT_END_NAMESPACE
 
-/** Interface from Qt to configuration data structure for neoxa client.
+/** Interface from Qt to configuration data structure for Bitcoin client.
    To Qt, the options are presented as a list with the different options
    laid out vertically.
    This can be changed to a tree once the settings become sufficiently
@@ -40,16 +38,23 @@ public:
         ProxyUseTor,            // bool
         ProxyIPTor,             // QString
         ProxyPortTor,           // int
-        DisplayUnit,            // NeoxaUnits::Unit
+        DisplayUnit,            // BitcoinUnits::Unit
         ThirdPartyTxUrls,       // QString
+        Digits,                 // QString
+        Theme,                  // QString
         Language,               // QString
         CoinControlFeatures,    // bool
         ThreadsScriptVerif,     // int
         DatabaseCache,          // int
         SpendZeroConfChange,    // bool
+        ShowSmartnodesTab,     // bool
+        ShowAdvancedPSUI,       // bool
+        ShowPrivateSendPopups,  // bool
+        LowKeysWarning,         // bool
+        PrivateSendRounds,      // int
+        PrivateSendAmount,      // int
+        PrivateSendMultiSession,// bool
         Listen,                 // bool
-        CustomFeeFeatures,      // bool
-        DarkModeEnabled,        // bool
         OptionIDRowCount,
     };
 
@@ -63,20 +68,22 @@ public:
     void setDisplayUnit(const QVariant &value);
 
     /* Explicit getters */
-    bool getHideTrayIcon() const { return fHideTrayIcon; }
-    bool getMinimizeToTray() const { return fMinimizeToTray; }
-    bool getMinimizeOnClose() const { return fMinimizeOnClose; }
-    int getDisplayUnit() const { return nDisplayUnit; }
-    QString getThirdPartyTxUrls() const { return strThirdPartyTxUrls; }
+    bool getHideTrayIcon() { return fHideTrayIcon; }
+    bool getMinimizeToTray() { return fMinimizeToTray; }
+    bool getMinimizeOnClose() { return fMinimizeOnClose; }
+    int getDisplayUnit() { return nDisplayUnit; }
+    QString getThirdPartyTxUrls() { return strThirdPartyTxUrls; }
     bool getProxySettings(QNetworkProxy& proxy) const;
-    bool getCoinControlFeatures() const { return fCoinControlFeatures; }
-    bool getCustomFeeFeatures() const { return fCustomFeeFeatures; }
-    bool getDarkModeEnabled() const { return fDarkModeEnabled; }
+    bool getCoinControlFeatures() { return fCoinControlFeatures; }
+    bool getShowAdvancedPSUI() { return fShowAdvancedPSUI; }
     const QString& getOverriddenByCommandLine() { return strOverriddenByCommandLine; }
+
+    QString getIpfsUrl() const { return strIpfsUrl; }
 
     /* Restart flag helper */
     void setRestartRequired(bool fRequired);
-    bool isRestartRequired() const;
+    bool isRestartRequired();
+    bool resetSettings;
 
 private:
     /* Qt-only settings */
@@ -87,13 +94,12 @@ private:
     int nDisplayUnit;
     QString strThirdPartyTxUrls;
     bool fCoinControlFeatures;
-    /** NEOXA START*/
-    bool fCustomFeeFeatures;
-    bool fDarkModeEnabled;
-    /** NEOXA END*/
+    bool fShowAdvancedPSUI;
     /* settings that were overridden by command-line */
     QString strOverriddenByCommandLine;
 
+    QString strIpfsUrl;
+    
     // Add option to list of GUI options overridden through command line/config file
     void addOverriddenOption(const std::string &option);
 
@@ -101,9 +107,11 @@ private:
     void checkAndMigrate();
 Q_SIGNALS:
     void displayUnitChanged(int unit);
+    void privateSendRoundsChanged();
+    void privateSentAmountChanged();
+    void advancedPSUIChanged(bool);
     void coinControlFeaturesChanged(bool);
-    void customFeeFeaturesChanged(bool);
     void hideTrayIconChanged(bool);
 };
 
-#endif // NEOXA_QT_OPTIONSMODEL_H
+#endif // BITCOIN_QT_OPTIONSMODEL_H

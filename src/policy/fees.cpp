@@ -1,7 +1,5 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2016 The Bitcoin Core developers
-// Copyright (c) 2017-2019 The Raven Core developers
-// Copyright (c) 2020-2021 The Neoxa Core developers
+// Copyright (c) 2009-2015 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -11,7 +9,6 @@
 #include "amount.h"
 #include "clientversion.h"
 #include "primitives/transaction.h"
-#include "random.h"
 #include "streams.h"
 #include "txmempool.h"
 #include "util.h"
@@ -182,7 +179,6 @@ TxConfirmStats::TxConfirmStats(const std::vector<double>& defaultBuckets,
     : buckets(defaultBuckets), bucketMap(defaultBucketMap)
 {
     decay = _decay;
-    assert(_scale != 0 && "_scale must be non-zero");
     scale = _scale;
     confAvg.resize(maxPeriods);
     for (unsigned int i = 0; i < maxPeriods; i++) {
@@ -415,15 +411,12 @@ void TxConfirmStats::Read(CAutoFile& filein, int nFileVersion, size_t numBuckets
     size_t maxConfirms, maxPeriods;
 
     // The current version will store the decay with each individual TxConfirmStats and also keep a scale factor
-    if (nFileVersion >= 149900) {
+    if (nFileVersion >= 140100) {
         filein >> decay;
         if (decay <= 0 || decay >= 1) {
             throw std::runtime_error("Corrupt estimates file. Decay must be between 0 and 1 (non-inclusive)");
         }
         filein >> scale;
-        if (scale == 0) {
-            throw std::runtime_error("Corrupt estimates file. Scale must be non-zero");
-        }
     }
 
     filein >> avg;
@@ -447,7 +440,7 @@ void TxConfirmStats::Read(CAutoFile& filein, int nFileVersion, size_t numBuckets
         }
     }
 
-    if (nFileVersion >= 149900) {
+    if (nFileVersion >= 140100) {
         filein >> failAvg;
         if (maxPeriods != failAvg.size()) {
             throw std::runtime_error("Corrupt estimates file. Mismatch in confirms tracked for failures");
@@ -509,7 +502,6 @@ void TxConfirmStats::removeTx(unsigned int entryHeight, unsigned int nBestSeenHe
         }
     }
     if (!inBlock && (unsigned int)blocksAgo >= scale) { // Only counts as a failure if not confirmed for entire period
-        assert(scale != 0);
         unsigned int periodsAgo = blocksAgo / scale;
         for (size_t i = 0; i < periodsAgo && i < failAvg.size(); i++) {
             failAvg[i][bucketindex]++;
@@ -568,9 +560,8 @@ void CBlockPolicyEstimator::processTransaction(const CTxMemPoolEntry& entry, boo
     unsigned int txHeight = entry.GetHeight();
     uint256 hash = entry.GetTx().GetHash();
     if (mapMemPoolTxs.count(hash)) {
-        LogPrint(BCLog::ESTIMATEFEE, "Blockpolicy error mempool tx %s already being tracked\n",
-                 hash.ToString().c_str());
-	return;
+        LogPrint(BCLog::ESTIMATEFEE, "Blockpolicy error mempool tx %s already being tracked\n", hash.ToString());
+        return;
     }
 
     if (txHeight != nBestSeenHeight) {
@@ -589,7 +580,7 @@ void CBlockPolicyEstimator::processTransaction(const CTxMemPoolEntry& entry, boo
     }
     trackedTxs++;
 
-    // Feerates are stored and reported as NEOX-per-kb:
+    // Feerates are stored and reported as BTC-per-kb:
     CFeeRate feeRate(entry.GetFee(), entry.GetTxSize());
 
     mapMemPoolTxs[hash].blockHeight = txHeight;
@@ -619,7 +610,7 @@ bool CBlockPolicyEstimator::processBlockTx(unsigned int nBlockHeight, const CTxM
         return false;
     }
 
-    // Feerates are stored and reported as NEOX-per-kb:
+    // Feerates are stored and reported as BTC-per-kb:
     CFeeRate feeRate(entry->GetFee(), entry->GetTxSize());
 
     feeStats->Record(blocksToConfirm, (double)feeRate.GetFeePerK());
@@ -721,7 +712,7 @@ CFeeRate CBlockPolicyEstimator::estimateRawFee(int confTarget, double successThr
     if (median < 0)
         return CFeeRate(0);
 
-    return CFeeRate(llround(median));
+    return CFeeRate(median);
 }
 
 unsigned int CBlockPolicyEstimator::HighestTargetTracked(FeeEstimateHorizon horizon) const
@@ -908,7 +899,7 @@ CFeeRate CBlockPolicyEstimator::estimateSmartFee(int confTarget, FeeCalculation 
 
     if (median < 0) return CFeeRate(0); // error condition
 
-    return CFeeRate(llround(median));
+    return CFeeRate(median);
 }
 
 
@@ -916,7 +907,7 @@ bool CBlockPolicyEstimator::Write(CAutoFile& fileout) const
 {
     try {
         LOCK(cs_feeEstimator);
-        fileout << 149900; // version required to read: 0.14.99 or later
+        fileout << 140100; // version required to read: 0.14.1 or later
         fileout << CLIENT_VERSION; // version that wrote the file
         fileout << nBestSeenHeight;
         if (BlockSpan() > HistoricalBlockSpan()/2) {
@@ -942,16 +933,16 @@ bool CBlockPolicyEstimator::Read(CAutoFile& filein)
     try {
         LOCK(cs_feeEstimator);
         int nVersionRequired, nVersionThatWrote;
+        unsigned int nFileBestSeenHeight, nFileHistoricalFirst, nFileHistoricalBest;
         filein >> nVersionRequired >> nVersionThatWrote;
         if (nVersionRequired > CLIENT_VERSION)
             return error("CBlockPolicyEstimator::Read(): up-version (%d) fee estimate file", nVersionRequired);
 
         // Read fee estimates file into temporary variables so existing data
         // structures aren't corrupted if there is an exception.
-        unsigned int nFileBestSeenHeight;
         filein >> nFileBestSeenHeight;
 
-        if (nVersionThatWrote < 149900) {
+        if (nVersionThatWrote < 140100) {
             // Read the old fee estimates file for temporary use, but then discard.  Will start collecting data from scratch.
             // decay is stored before buckets in old versions, so pre-read decay and pass into TxConfirmStats constructor
             double tempDecay;
@@ -969,15 +960,14 @@ bool CBlockPolicyEstimator::Read(CAutoFile& filein)
 
             std::unique_ptr<TxConfirmStats> tempFeeStats(new TxConfirmStats(tempBuckets, tempMap, MED_BLOCK_PERIODS, tempDecay, 1));
             tempFeeStats->Read(filein, nVersionThatWrote, tempNum);
-            // if nVersionThatWrote < 139900 then another TxConfirmStats (for priority) follows but can be ignored.
+            // if nVersionThatWrote < 120300 then another TxConfirmStats (for priority) follows but can be ignored.
 
             tempMap.clear();
             for (unsigned int i = 0; i < tempBuckets.size(); i++) {
                 tempMap[tempBuckets[i]] = i;
             }
         }
-        else { // nVersionThatWrote >= 149900
-            unsigned int nFileHistoricalFirst, nFileHistoricalBest;
+        else { // nVersionThatWrote >= 140100
             filein >> nFileHistoricalFirst >> nFileHistoricalBest;
             if (nFileHistoricalFirst > nFileHistoricalBest || nFileHistoricalBest > nFileBestSeenHeight) {
                 throw std::runtime_error("Corrupt estimates file. Historical block range for estimates is invalid");
@@ -1032,27 +1022,8 @@ void CBlockPolicyEstimator::FlushUnconfirmed(CTxMemPool& pool) {
         removeTx(txid, false);
     }
     int64_t endclear = GetTimeMicros();
-    LogPrint(BCLog::ESTIMATEFEE, "Recorded %u unconfirmed txs from mempool in %gs\n",txids.size(), (endclear - startclear)*0.000001);
+    LogPrint(BCLog::ESTIMATEFEE, "Recorded %u unconfirmed txs from mempool in %ld micros\n",txids.size(), endclear - startclear);
 }
-
-FeeFilterRounder::FeeFilterRounder(const CFeeRate& minIncrementalFee)
-{
-    CAmount minFeeLimit = std::max(CAmount(1), minIncrementalFee.GetFeePerK() / 2);
-    feeset.insert(0);
-    for (double bucketBoundary = minFeeLimit; bucketBoundary <= MAX_FILTER_FEERATE; bucketBoundary *= FEE_FILTER_SPACING) {
-        feeset.insert(bucketBoundary);
-    }
-}
-
-CAmount FeeFilterRounder::round(CAmount currentMinFee)
-{
-    std::set<double>::iterator it = feeset.lower_bound(currentMinFee);
-    if ((it != feeset.begin() && insecure_rand.rand32() % 3 != 0) || it == feeset.end()) {
-        it--;
-    }
-    return static_cast<CAmount>(*it);
-}
-
 
 int getConfTargetForIndex(int index) {
     if (index+1 > static_cast<int>(confTargets.size())) {

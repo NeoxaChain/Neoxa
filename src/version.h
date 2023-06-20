@@ -1,36 +1,33 @@
-// Copyright (c) 2012-2016 The Bitcoin Core developers
-// Copyright (c) 2017-2021 The Raven Core developers
+// Copyright (c) 2012-2014 The Bitcoin Core developers
+// Copyright (c) 2014-2020 The Dash Core developers
+// Copyright (c) 2020 The Neoxa developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef NEOXA_VERSION_H
-#define NEOXA_VERSION_H
+#ifndef BITCOIN_VERSION_H
+#define BITCOIN_VERSION_H
 
 /**
  * network protocol versioning
  */
 
-static const int PROTOCOL_VERSION = 70028;
+
+static const int PROTOCOL_VERSION = 70030;
+
+//! minimum proto version of masternode to accept in DKGs
+static const int MIN_SMARTNODE_PROTO_VERSION = 70030;
 
 //! initial proto version, to be increased after version/verack negotiation
 static const int INIT_PROTO_VERSION = 209;
 
 //! In this version, 'getheaders' was introduced.
-static const int GETHEADERS_VERSION = 31800;
-
-//! assetdata network request is allowed for this version
-static const int ASSETDATA_VERSION = 70017;
-
-//! getassetdata reutrn asstnotfound, and assetdata doesn't have blockhash in the data
-static const int X16RV2_VERSION = 70025;
-
-//! getassetdata reutrn asstnotfound, and assetdata doesn't have blockhash in the data
-static const int KAWPOW_VERSION = 70027;
+static const int GETHEADERS_VERSION = 70017;
 
 //! disconnect from peers older than this proto version
-//!!! Anytime this value is changed please also update the "MY_VERSION" value to match in the
-//!!! ./test/functional/test_framework/mininode.py file. Not doing so will cause verack to fail!
-static const int MIN_PEER_PROTO_VERSION = X16RV2_VERSION;
+static const int MIN_PEER_PROTO_VERSION = 70028;
+
+//! disconnect from peers older than this proto version
+static const int NEW_MIN_PEER_PROTO_VERSION = 70030;
 
 //! nTime field added to CAddress, starting with this version;
 //! if possible, avoid requesting addresses nodes older than this
@@ -45,20 +42,20 @@ static const int NO_BLOOM_VERSION = 70011;
 //! "sendheaders" command and announcing blocks with headers starts with this version
 static const int SENDHEADERS_VERSION = 70012;
 
-//! "feefilter" tells peers to filter invs to you by fee starts with this version
-static const int FEEFILTER_VERSION = 70013;
+//! DIP0001 was activated in this version
+static const int DIP0001_PROTOCOL_VERSION = 70208;
 
 //! short-id-based block download starts with this version
 static const int SHORT_IDS_BLOCKS_VERSION = 70014;
 
-//! not banning for invalid compact blocks starts with this version
-static const int INVALID_CB_NO_BAN_VERSION = 70015;
+//! introduction of DIP3/deterministic smartnodes
+static const int DMN_PROTO_VERSION = 70030;
 
-//! getassetdata reutrn asstnotfound, and assetdata doesn't have blockhash in the data
-static const int ASSETDATA_VERSION_UPDATED = 70020;
+//! introduction of LLMQs
+static const int LLMQS_PROTO_VERSION = 70030;
 
-//! In this version, 'rip5 (messaging and restricted assets)' was introduced
-static const int MESSAGING_RESTRICTED_ASSETS_VERSION = 70026;
+//! introduction of SENDDSQUEUE
+//! TODO we can remove this in 0.15.0.0
+static const int SENDDSQUEUE_PROTO_VERSION = 70030;
 
-
-#endif // NEOXA_VERSION_H
+#endif // BITCOIN_VERSION_H

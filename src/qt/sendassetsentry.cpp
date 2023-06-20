@@ -53,8 +53,7 @@ SendAssetsEntry::SendAssetsEntry(const PlatformStyle *_platformStyle, const QStr
     // normal neoxa address field
     GUIUtil::setupAddressWidget(ui->payTo, this);
     // just a label for displaying neoxa address(es)
-    ui->payTo_is->setFont(GUIUtil::fixedPitchFont());
-
+    
     // Connect signals
     connect(ui->payAssetAmount, SIGNAL(valueChanged()), this, SIGNAL(payAmountChanged()));
     connect(ui->deleteButton, SIGNAL(clicked()), this, SLOT(deleteClicked()));
@@ -96,43 +95,17 @@ SendAssetsEntry::SendAssetsEntry(const PlatformStyle *_platformStyle, const QStr
 
     fShowAdministratorList = false;
 
-    this->setStyleSheet(QString(".SendAssetsEntry {background-color: %1; padding-top: 10px; padding-right: 30px; border: none;}").arg(platformStyle->SendEntriesBackGroundColor().name()));
+    //this->setStyleSheet(QString(".SendAssetsEntry {background-color: %1; padding-top: 10px; padding-right: 30px; border: none;}").arg(platformStyle->SendEntriesBackGroundColor().name()));
 
-    this->setGraphicsEffect(GUIUtil::getShadowEffect());
-
-    ui->assetBoxLabel->setStyleSheet(STRING_LABEL_COLOR);
-    ui->assetBoxLabel->setFont(GUIUtil::getSubLabelFont());
-
-    ui->payToLabel->setStyleSheet(STRING_LABEL_COLOR);
-    ui->payToLabel->setFont(GUIUtil::getSubLabelFont());
-
-    ui->labellLabel->setStyleSheet(STRING_LABEL_COLOR);
-    ui->labellLabel->setFont(GUIUtil::getSubLabelFont());
-
-    ui->amountLabel->setStyleSheet(STRING_LABEL_COLOR);
-    ui->amountLabel->setFont(GUIUtil::getSubLabelFont());
-
-    ui->messageLabel->setStyleSheet(STRING_LABEL_COLOR);
-    ui->messageLabel->setFont(GUIUtil::getSubLabelFont());
+    //this->setGraphicsEffect(GUIUtil::getShadowEffect());
 
     ui->payAssetAmount->setUnit(MAX_UNIT);
     ui->payAssetAmount->setDisabled(false);
 
-    ui->administratorCheckbox->setStyleSheet(QString(".QCheckBox{ %1; }").arg(STRING_LABEL_COLOR));
+    //ui->administratorCheckbox->setStyleSheet(QString(".QCheckBox{ %1; }").arg(STRING_LABEL_COLOR));
 
-    ui->assetSelectionBox->setFont(GUIUtil::getSubLabelFont());
-    ui->administratorCheckbox->setFont(GUIUtil::getSubLabelFont());
-    ui->payTo->setFont(GUIUtil::getSubLabelFont());
-    ui->addAsLabel->setFont(GUIUtil::getSubLabelFont());
-    ui->payAssetAmount->setFont(GUIUtil::getSubLabelFont());
-    ui->messageTextLabel->setFont(GUIUtil::getSubLabelFont());
-    ui->assetAmountLabel->setFont(GUIUtil::getSubLabelFont());
-    ui->ownershipWarningMessage->setFont(GUIUtil::getSubLabelFont());
-
+    
     ui->memoBox->installEventFilter(this);
-    ui->memoLabel->setFont(GUIUtil::getSubLabelFont());
-    ui->memoLabel->setStyleSheet(STRING_LABEL_COLOR);
-    ui->memoBox->setFont(GUIUtil::getSubLabelFont());
 }
 
 SendAssetsEntry::~SendAssetsEntry()
@@ -218,7 +191,7 @@ bool SendAssetsEntry::validate()
     }
 
     if (ui->assetSelectionBox->currentIndex() == 0) {
-        ui->assetSelectionBox->lineEdit()->setStyleSheet(STYLE_INVALID);
+       // ui->assetSelectionBox->lineEdit()->setStyleSheet(STYLE_INVALID);
         retval = false;
     }
 
@@ -237,28 +210,25 @@ bool SendAssetsEntry::validate()
         if (!AreMessagesDeployed()) {
             ui->messageTextLabel->show();
             ui->messageTextLabel->setText(tr("Memos can only be added once HIP5 is voted in"));
-            ui->memoBox->setStyleSheet(STYLE_INVALID);
+            //ui->memoBox->setStyleSheet(STYLE_INVALID);
             retval = false;
         }
 
         size_t size = ui->memoBox->text().size();
-
+        
         if (size != 46) {
             if (!AreMessagesDeployed()) {
-
-                ui->memoBox->setStyleSheet(STYLE_INVALID);
                 retval = false;
             } else {
                 if (size != 64) {
-                    ui->memoBox->setStyleSheet(STYLE_INVALID);
                     retval = false;
                 }
             }
-        }
+        }     
 
         std::string error = "";
         if(!CheckEncoded(DecodeAssetData(ui->memoBox->text().toStdString()), error)) {
-            ui->memoBox->setStyleSheet(STYLE_INVALID);
+            //ui->memoBox->setStyleSheet(STYLE_INVALID);
             retval = false;
         }
 
@@ -267,7 +237,7 @@ bool SendAssetsEntry::validate()
     if (IsAssetNameAnRestricted(assetName)) {
         if (passets) {
             if (passets->CheckForGlobalRestriction(assetName)) {
-                ui->assetSelectionBox->lineEdit()->setStyleSheet(STYLE_INVALID);
+                //ui->assetSelectionBox->lineEdit()->setStyleSheet(STYLE_INVALID);
                 ui->messageTextLabel->show();
                 ui->messageTextLabel->setText(tr("This restricted asset has been frozen globally. No transfers can be sent on the network."));
                 retval = false;
@@ -377,6 +347,7 @@ void SendAssetsEntry::onAssetSelected(int index)
         if(!ui->administratorCheckbox->isChecked())
             ui->payAssetAmount->setDisabled(false);
         ui->payAssetAmount->clear();
+        ui->payAssetAmount->setDisabled(true);
         return;
     }
 
@@ -385,6 +356,12 @@ void SendAssetsEntry::onAssetSelected(int index)
     if (IsAssetNameAnOwner(name.toStdString())) {
         fIsOwnerAsset = true;
         name = name.split("!").first();
+    }
+
+    // Check to see if the asset selected is an messenger asset
+    bool fIsMessengerAsset = false;
+    if (IsAssetNameAnMsgChannel(name.toStdString())) {
+        fIsMessengerAsset = true;
     }
 
     LOCK(cs_main);
@@ -442,10 +419,18 @@ void SendAssetsEntry::onAssetSelected(int index)
     ui->messageLabel->hide();
     ui->messageTextLabel->hide();
 
-    // If it is an ownership asset lock the amount
+    // If it is not an ownership asset unlock the amount
     if (!fIsOwnerAsset) {
         ui->payAssetAmount->setUnit(asset.units);
+        ui->payAssetAmount->setSingleStep(1);
         ui->payAssetAmount->setDisabled(false);
+        ui->payAssetAmount->setValue(0);
+    }
+    // If it is messanger channel set amount to 1 and keep locked.
+    if (fIsMessengerAsset) {
+        ui->payAssetAmount->setUnit(asset.units);
+        ui->payAssetAmount->setDisabled(true);
+        ui->payAssetAmount->setValue(1);
     }
 }
 
@@ -531,13 +516,20 @@ void SendAssetsEntry::switchAdministratorList(bool fSwitchStatus)
                 if (!IsAssetNameAnOwner(name))
                     list << QString::fromStdString(name);
             }
+            int index = ui->assetSelectionBox->currentIndex();
+            QString name = ui->assetSelectionBox->currentText();
 
             stringModel->setStringList(list);
-            ui->assetSelectionBox->lineEdit()->setPlaceholderText(tr("Select an asset to transfer"));
-            ui->payAssetAmount->clear();
-            ui->payAssetAmount->setUnit(MAX_UNIT);
-            ui->assetAmountLabel->clear();
-            ui->assetSelectionBox->setFocus();
+            if (index == 0){
+                ui->assetSelectionBox->lineEdit()->setPlaceholderText(tr("Select an asset to transfer"));
+                ui->payAssetAmount->clear();
+                ui->payAssetAmount->setUnit(MAX_UNIT);
+                ui->assetAmountLabel->clear();
+                ui->assetSelectionBox->setFocus();
+            } else { //restore previous values
+                index = ui->assetSelectionBox->findText(name);
+                ui->assetSelectionBox->setCurrentIndex(index);
+            }
         } else {
             ui->payTo->setFocus();
         }

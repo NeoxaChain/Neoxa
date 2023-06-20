@@ -7,6 +7,7 @@
 
 #include <qt/guiutil.h>
 #include <wallet/wallet.h>
+#include <bip39.h>
 
 #include <QDebug>
 

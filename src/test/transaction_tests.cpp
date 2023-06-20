@@ -1,5 +1,4 @@
-// Copyright (c) 2011-2016 The Bitcoin Core developers
-// Copyright (c) 2017-2021 The Raven Core developers
+// Copyright (c) 2011-2015 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -35,7 +34,6 @@ typedef std::vector<unsigned char> valtype;
 
 // In script_tests.cpp
 extern UniValue read_json(const std::string &jsondata);
-
 
 static std::map<std::string, unsigned int> mapFlagNames = {
         {std::string("NONE"),                                  (unsigned int) SCRIPT_VERIFY_NONE},
@@ -160,7 +158,7 @@ BOOST_FIXTURE_TEST_SUITE(transaction_tests, BasicTestingSetup)
                 CTransaction tx(deserialize, stream);
 
                 CValidationState state;
-                BOOST_CHECK_MESSAGE(CheckTransaction(tx, state), strTest);
+                BOOST_CHECK_MESSAGE(CheckTransaction(tx, state, 0, 0), strTest);
                 BOOST_CHECK(state.IsValid());
 
                 PrecomputedTransactionData txdata(tx);
@@ -252,7 +250,7 @@ BOOST_FIXTURE_TEST_SUITE(transaction_tests, BasicTestingSetup)
                 CTransaction tx(deserialize, stream);
 
                 CValidationState state;
-                fValid = CheckTransaction(tx, state) && state.IsValid();
+                fValid = CheckTransaction(tx, state, 0, 0) && state.IsValid();
 
                 PrecomputedTransactionData txdata(tx);
                 for (unsigned int i = 0; i < tx.vin.size() && fValid; i++)
@@ -290,11 +288,11 @@ BOOST_FIXTURE_TEST_SUITE(transaction_tests, BasicTestingSetup)
         CMutableTransaction tx;
         stream >> tx;
         CValidationState state;
-        BOOST_CHECK_MESSAGE(CheckTransaction(tx, state) && state.IsValid(), "Simple deserialized transaction should be valid.");
+        BOOST_CHECK_MESSAGE(CheckTransaction(tx, state, 0, 0) && state.IsValid(), "Simple deserialized transaction should be valid.");
 
         // Check that duplicate txins fail
         tx.vin.push_back(tx.vin[0]);
-        BOOST_CHECK_MESSAGE(!CheckTransaction(tx, state) || !state.IsValid(), "Transaction with duplicate txins should be invalid.");
+        BOOST_CHECK_MESSAGE(!CheckTransaction(tx, state, 0, 0) || !state.IsValid(), "Transaction with duplicate txins should be invalid.");
     }
 
     //

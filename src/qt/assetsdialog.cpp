@@ -1,6 +1,5 @@
 // Copyright (c) 2011-2016 The Bitcoin Core developers
-// Copyright (c) 2017-2019 The Raven Core developers
-// Copyright (c) 2020-2021 The Neoxa Core developers
+// Copyright (c) 2017-2021 The Raven Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -9,7 +8,7 @@
 #include "ui_assetsdialog.h"
 
 #include "addresstablemodel.h"
-#include "neoxaunits.h"
+#include "bitcoinunits.h"
 #include "clientmodel.h"
 #include "assetcontroldialog.h"
 #include "guiutil.h"
@@ -26,9 +25,7 @@
 #include "ui_interface.h"
 #include "txmempool.h"
 #include "policy/fees.h"
-#include "wallet/fees.h"
 #include "createassetdialog.h"
-#include "reissueassetdialog.h"
 #include "guiconstants.h"
 
 #include <QGraphicsDropShadowEffect>
@@ -45,6 +42,7 @@
 #if QT_VERSION < QT_VERSION_CHECK(5, 11, 0)
 #define QTversionPreFiveEleven
 #endif
+#define SEND_CONFIRM_DELAY   3
 
 AssetsDialog::AssetsDialog(const PlatformStyle *_platformStyle, QWidget *parent) :
         QDialog(parent),
@@ -123,11 +121,11 @@ AssetsDialog::AssetsDialog(const PlatformStyle *_platformStyle, QWidget *parent)
     ui->checkBoxMinimumFee->setChecked(settings.value("fPayOnlyMinFee").toBool());
     minimizeFeeSection(settings.value("fFeeSectionMinimized").toBool());
 
-    /** NEOXA START */
+    /** NEOX START */
     setupAssetControlFrame(platformStyle);
     setupScrollView(platformStyle);
     setupFeeControl(platformStyle);
-    /** NEOXA END */
+    /** NEOX END */
 }
 
 void AssetsDialog::setClientModel(ClientModel *_clientModel)
@@ -154,9 +152,9 @@ void AssetsDialog::setModel(WalletModel *_model)
             }
         }
 
-        setBalance(_model->getBalance(), _model->getUnconfirmedBalance(), _model->getImmatureBalance(),
+        setBalance(_model->getBalance(), _model->getUnconfirmedBalance(), _model->getImmatureBalance(), _model->getAnonymizedBalance(),
                    _model->getWatchBalance(), _model->getWatchUnconfirmedBalance(), _model->getWatchImmatureBalance());
-        connect(_model, SIGNAL(balanceChanged(CAmount,CAmount,CAmount,CAmount,CAmount,CAmount)), this, SLOT(setBalance(CAmount,CAmount,CAmount,CAmount,CAmount,CAmount)));
+        connect(_model, SIGNAL(balanceChanged(CAmount,CAmount,CAmount,CAmount,CAmount,CAmount,CAmount)), this, SLOT(setBalance(CAmount,CAmount,CAmount,CAmount,CAmount,CAmount,CAmount)));
         connect(_model->getOptionsModel(), SIGNAL(displayUnitChanged(int)), this, SLOT(updateDisplayUnit()));
         updateDisplayUnit();
 
@@ -164,37 +162,30 @@ void AssetsDialog::setModel(WalletModel *_model)
         connect(_model->getOptionsModel(), SIGNAL(displayUnitChanged(int)), this, SLOT(assetControlUpdateLabels()));
         connect(_model->getOptionsModel(), SIGNAL(coinControlFeaturesChanged(bool)), this, SLOT(assetControlFeatureChanged(bool)));
 
-        // Custom Fee Control
-        connect(_model->getOptionsModel(), SIGNAL(customFeeFeaturesChanged(bool)), this, SLOT(customFeeFeatureChanged(bool)));
-
-
         ui->frameAssetControl->setVisible(false);
         ui->frameAssetControl->setVisible(_model->getOptionsModel()->getCoinControlFeatures());
-        ui->frameFee->setVisible(_model->getOptionsModel()->getCustomFeeFeatures());
+        //ui->frameFee->setVisible(_model->getOptionsModel()->getCustomFeeFeatures());
         assetControlUpdateLabels();
 
         // fee section
         for (const int &n : confTargets) {
-            ui->confTargetSelector->addItem(tr("%1 (%2 blocks)").arg(GUIUtil::formatNiceTimeOffset(n * GetParams().GetConsensus().nPowTargetSpacing)).arg(n));
+            ui->confTargetSelector->addItem(tr("%1 (%2 blocks)").arg(GUIUtil::formatNiceTimeOffset(n * Params().GetConsensus().nPowTargetSpacing)).arg(n));
         }
         connect(ui->confTargetSelector, SIGNAL(currentIndexChanged(int)), this, SLOT(updateSmartFeeLabel()));
         connect(ui->confTargetSelector, SIGNAL(currentIndexChanged(int)), this, SLOT(assetControlUpdateLabels()));
+#if (QT_VERSION >= QT_VERSION_CHECK(5, 15, 0))
+        connect(ui->groupFee, &QButtonGroup::idClicked, this, &AssetsDialog::updateFeeSectionControls);
+#else
         connect(ui->groupFee, SIGNAL(buttonClicked(int)), this, SLOT(updateFeeSectionControls()));
-        connect(ui->groupFee, SIGNAL(buttonClicked(int)), this, SLOT(assetControlUpdateLabels()));
+#endif
         connect(ui->customFee, SIGNAL(valueChanged()), this, SLOT(assetControlUpdateLabels()));
         connect(ui->checkBoxMinimumFee, SIGNAL(stateChanged(int)), this, SLOT(setMinimumFee()));
         connect(ui->checkBoxMinimumFee, SIGNAL(stateChanged(int)), this, SLOT(updateFeeSectionControls()));
         connect(ui->checkBoxMinimumFee, SIGNAL(stateChanged(int)), this, SLOT(assetControlUpdateLabels()));
-//        connect(ui->optInRBF, SIGNAL(stateChanged(int)), this, SLOT(updateSmartFeeLabel()));
-//        connect(ui->optInRBF, SIGNAL(stateChanged(int)), this, SLOT(assetControlUpdateLabels()));
-        ui->customFee->setSingleStep(GetRequiredFee(1000));
+        ui->customFee->setSingleStep(CWallet::GetRequiredFee(1000));
         updateFeeSectionControls();
         updateMinFeeLabel();
         updateSmartFeeLabel();
-
-        // set default rbf checkbox state
-//        ui->optInRBF->setCheckState(model->getDefaultWalletRbf() ? Qt::Checked : Qt::Unchecked);
-        ui->optInRBF->hide();
 
         // set the smartfee-sliders default value (wallets default conf.target or last stored value)
         QSettings settings;
@@ -226,104 +217,17 @@ AssetsDialog::~AssetsDialog()
 
 void AssetsDialog::setupAssetControlFrame(const PlatformStyle *platformStyle)
 {
-    /** Update the assetcontrol frame */
-    ui->frameAssetControl->setStyleSheet(QString(".QFrame {background-color: %1; padding-top: 10px; padding-right: 5px; border: none;}").arg(platformStyle->WidgetBackGroundColor().name()));
-    ui->widgetAssetControl->setStyleSheet(".QWidget {background-color: transparent;}");
-    /** Create the shadow effects on the frames */
-
-    ui->frameAssetControl->setGraphicsEffect(GUIUtil::getShadowEffect());
-
-    ui->labelAssetControlFeatures->setStyleSheet(STRING_LABEL_COLOR);
-    ui->labelAssetControlFeatures->setFont(GUIUtil::getTopLabelFont());
-
-    ui->labelAssetControlQuantityText->setStyleSheet(STRING_LABEL_COLOR);
-    ui->labelAssetControlQuantityText->setFont(GUIUtil::getSubLabelFont());
-
-    ui->labelAssetControlAmountText->setStyleSheet(STRING_LABEL_COLOR);
-    ui->labelAssetControlAmountText->setFont(GUIUtil::getSubLabelFont());
-
-    ui->labelAssetControlFeeText->setStyleSheet(STRING_LABEL_COLOR);
-    ui->labelAssetControlFeeText->setFont(GUIUtil::getSubLabelFont());
-
-    ui->labelAssetControlAfterFeeText->setStyleSheet(STRING_LABEL_COLOR);
-    ui->labelAssetControlAfterFeeText->setFont(GUIUtil::getSubLabelFont());
-
-    ui->labelAssetControlBytesText->setStyleSheet(STRING_LABEL_COLOR);
-    ui->labelAssetControlBytesText->setFont(GUIUtil::getSubLabelFont());
-
-    ui->labelAssetControlLowOutputText->setStyleSheet(STRING_LABEL_COLOR);
-    ui->labelAssetControlLowOutputText->setFont(GUIUtil::getSubLabelFont());
-
-    ui->labelAssetControlChangeText->setStyleSheet(STRING_LABEL_COLOR);
-    ui->labelAssetControlChangeText->setFont(GUIUtil::getSubLabelFont());
-
-    // Align the other labels next to the input buttons to the text in the same height
-    ui->labelAssetControlAutomaticallySelected->setStyleSheet(STRING_LABEL_COLOR);
-
-    // Align the Custom change address checkbox
-    ui->checkBoxAssetControlChange->setStyleSheet(QString(".QCheckBox{ %1; }").arg(STRING_LABEL_COLOR));
-
-    ui->labelAssetControlQuantity->setFont(GUIUtil::getSubLabelFont());
-    ui->labelAssetControlAmount->setFont(GUIUtil::getSubLabelFont());
-    ui->labelAssetControlFee->setFont(GUIUtil::getSubLabelFont());
-    ui->labelAssetControlAfterFee->setFont(GUIUtil::getSubLabelFont());
-    ui->labelAssetControlBytes->setFont(GUIUtil::getSubLabelFont());
-    ui->labelAssetControlLowOutput->setFont(GUIUtil::getSubLabelFont());
-    ui->labelAssetControlChange->setFont(GUIUtil::getSubLabelFont());
-    ui->checkBoxAssetControlChange->setFont(GUIUtil::getSubLabelFont());
-    ui->lineEditAssetControlChange->setFont(GUIUtil::getSubLabelFont());
-    ui->labelAssetControlInsuffFunds->setFont(GUIUtil::getSubLabelFont());
-    ui->labelAssetControlAutomaticallySelected->setFont(GUIUtil::getSubLabelFont());
-
+   
 }
 
 void AssetsDialog::setupScrollView(const PlatformStyle *platformStyle)
 {
-    /** Update the scrollview*/
-    ui->scrollArea->setStyleSheet(QString(".QScrollArea{background-color: %1; border: none}").arg(platformStyle->WidgetBackGroundColor().name()));
-    ui->scrollArea->setGraphicsEffect(GUIUtil::getShadowEffect());
 
-    // Add some spacing so we can see the whole card
-    ui->entries->setContentsMargins(10,10,20,0);
-    ui->scrollAreaWidgetContents->setStyleSheet(QString(".QWidget{ background-color: %1;}").arg(platformStyle->WidgetBackGroundColor().name()));
 }
 
 void AssetsDialog::setupFeeControl(const PlatformStyle *platformStyle)
 {
-    /** Update the coincontrol frame */
-    ui->frameFee->setStyleSheet(QString(".QFrame {background-color: %1; padding-top: 10px; padding-right: 5px; border: none;}").arg(platformStyle->WidgetBackGroundColor().name()));
-    /** Create the shadow effects on the frames */
-
-    ui->frameFee->setGraphicsEffect(GUIUtil::getShadowEffect());
-
-    ui->labelFeeHeadline->setStyleSheet(STRING_LABEL_COLOR);
-    ui->labelFeeHeadline->setFont(GUIUtil::getSubLabelFont());
-
-    ui->labelSmartFee3->setStyleSheet(STRING_LABEL_COLOR);
-    ui->labelCustomPerKilobyte->setStyleSheet(QString(".QLabel{ %1; }").arg(STRING_LABEL_COLOR));
-    ui->radioSmartFee->setStyleSheet(STRING_LABEL_COLOR);
-    ui->radioCustomFee->setStyleSheet(STRING_LABEL_COLOR);
-    ui->checkBoxMinimumFee->setStyleSheet(QString(".QCheckBox{ %1; }").arg(STRING_LABEL_COLOR));
-
-    ui->buttonChooseFee->setFont(GUIUtil::getSubLabelFont());
-    ui->fallbackFeeWarningLabel->setFont(GUIUtil::getSubLabelFont());
-    ui->buttonMinimizeFee->setFont(GUIUtil::getSubLabelFont());
-    ui->radioSmartFee->setFont(GUIUtil::getSubLabelFont());
-    ui->labelSmartFee2->setFont(GUIUtil::getSubLabelFont());
-    ui->labelSmartFee3->setFont(GUIUtil::getSubLabelFont());
-    ui->confTargetSelector->setFont(GUIUtil::getSubLabelFont());
-    ui->radioCustomFee->setFont(GUIUtil::getSubLabelFont());
-    ui->labelCustomPerKilobyte->setFont(GUIUtil::getSubLabelFont());
-    ui->customFee->setFont(GUIUtil::getSubLabelFont());
-    ui->labelMinFeeWarning->setFont(GUIUtil::getSubLabelFont());
-    ui->optInRBF->setFont(GUIUtil::getSubLabelFont());
-    ui->sendButton->setFont(GUIUtil::getSubLabelFont());
-    ui->clearButton->setFont(GUIUtil::getSubLabelFont());
-    ui->addButton->setFont(GUIUtil::getSubLabelFont());
-    ui->labelSmartFee->setFont(GUIUtil::getSubLabelFont());
-    ui->labelFeeEstimation->setFont(GUIUtil::getSubLabelFont());
-    ui->labelFeeMinimized->setFont(GUIUtil::getSubLabelFont());
-
+    
 }
 
 void AssetsDialog::on_sendButton_clicked()
@@ -383,9 +287,6 @@ void AssetsDialog::on_sendButton_clicked()
     CAmount nFeeRequired;
 
     if (IsInitialBlockDownload()) {
-        GUIUtil::SyncWarningMessage syncWarning(this);
-        bool sendTransaction = syncWarning.showTransactionSyncWarningMessage();
-        if (!sendTransaction)
             return;
     }
 
@@ -439,21 +340,14 @@ void AssetsDialog::on_sendButton_clicked()
     if(nFeeRequired > 0)
     {
         // append fee string if a fee is required
-        questionString.append("<hr /><span style='color:#aa0000;'>");
-        questionString.append(NeoxaUnits::formatHtmlWithUnit(model->getOptionsModel()->getDisplayUnit(), nFeeRequired));
+        questionString.append("<hr /><span style='color:#e82121;'>");
+        questionString.append(BitcoinUnits::formatHtmlWithUnit(model->getOptionsModel()->getDisplayUnit(), nFeeRequired));
         questionString.append("</span> ");
         questionString.append(tr("added as transaction fee"));
 
         // append transaction size
         questionString.append(" (" + QString::number((double)GetVirtualTransactionSize(tx) / 1000) + " kB)");
     }
-
-//    if (ui->optInRBF->isChecked())
-//    {
-//        questionString.append("<hr /><span>");
-//        questionString.append(tr("This transaction signals replaceability (optin-RBF)."));
-//        questionString.append("</span>");
-//    }
 
     SendConfirmationDialog confirmationDialog(tr("Confirm send assets"),
                                               questionString.arg(formatted.join("<br />")), SEND_CONFIRM_DELAY, this);
@@ -636,7 +530,7 @@ bool AssetsDialog::handlePaymentRequest(const SendAssetsRecipient &rv)
     return true;
 }
 
-void AssetsDialog::setBalance(const CAmount& balance, const CAmount& unconfirmedBalance, const CAmount& immatureBalance,
+void AssetsDialog::setBalance(const CAmount& balance, const CAmount& unconfirmedBalance, const CAmount& immatureBalance, const CAmount& anonymizedBalance,
                                  const CAmount& watchBalance, const CAmount& watchUnconfirmedBalance, const CAmount& watchImmatureBalance)
 {
     Q_UNUSED(unconfirmedBalance);
@@ -645,18 +539,15 @@ void AssetsDialog::setBalance(const CAmount& balance, const CAmount& unconfirmed
     Q_UNUSED(watchUnconfirmedBalance);
     Q_UNUSED(watchImmatureBalance);
 
-    ui->labelBalance->setFont(GUIUtil::getSubLabelFont());
-    ui->label->setFont(GUIUtil::getSubLabelFont());
-
     if(model && model->getOptionsModel())
     {
-        ui->labelBalance->setText(NeoxaUnits::formatWithUnit(model->getOptionsModel()->getDisplayUnit(), balance));
+        ui->labelBalance->setText(BitcoinUnits::formatWithUnit(model->getOptionsModel()->getDisplayUnit(), balance));
     }
 }
 
 void AssetsDialog::updateDisplayUnit()
 {
-    setBalance(model->getBalance(), 0, 0, 0, 0, 0);
+    setBalance(model->getBalance(), 0, 0, 0, 0, 0, 0);
     ui->customFee->setDisplayUnit(model->getOptionsModel()->getDisplayUnit());
     updateMinFeeLabel();
     updateSmartFeeLabel();
@@ -697,7 +588,7 @@ void AssetsDialog::processSendCoinsReturn(const WalletModel::SendCoinsReturn &se
             msgParams.second = CClientUIInterface::MSG_ERROR;
             break;
         case WalletModel::AbsurdFee:
-            msgParams.first = tr("A fee higher than %1 is considered an absurdly high fee.").arg(NeoxaUnits::formatWithUnit(model->getOptionsModel()->getDisplayUnit(), maxTxFee));
+            msgParams.first = tr("A fee higher than %1 is considered an absurdly high fee.").arg(BitcoinUnits::formatWithUnit(model->getOptionsModel()->getDisplayUnit(), maxTxFee));
             break;
         case WalletModel::PaymentRequestExpired:
             msgParams.first = tr("Payment request expired.");
@@ -735,7 +626,7 @@ void AssetsDialog::on_buttonMinimizeFee_clicked()
 
 void AssetsDialog::setMinimumFee()
 {
-    ui->customFee->setValue(GetRequiredFee(1000));
+    ui->customFee->setValue(CWallet::GetRequiredFee(1000));
 }
 
 void AssetsDialog::updateFeeSectionControls()
@@ -759,7 +650,7 @@ void AssetsDialog::updateFeeMinimizedLabel()
     if (ui->radioSmartFee->isChecked())
         ui->labelFeeMinimized->setText(ui->labelSmartFee->text());
     else {
-        ui->labelFeeMinimized->setText(NeoxaUnits::formatWithUnit(model->getOptionsModel()->getDisplayUnit(), ui->customFee->value()) + "/kB");
+        ui->labelFeeMinimized->setText(BitcoinUnits::formatWithUnit(model->getOptionsModel()->getDisplayUnit(), ui->customFee->value()) + "/kB");
     }
 }
 
@@ -767,7 +658,7 @@ void AssetsDialog::updateMinFeeLabel()
 {
     if (model && model->getOptionsModel())
         ui->checkBoxMinimumFee->setText(tr("Pay only the required fee of %1").arg(
-                NeoxaUnits::formatWithUnit(model->getOptionsModel()->getDisplayUnit(), GetRequiredFee(1000)) + "/kB")
+                BitcoinUnits::formatWithUnit(model->getOptionsModel()->getDisplayUnit(), CWallet::GetRequiredFee(1000)) + "/kB")
         );
 }
 
@@ -781,7 +672,6 @@ void AssetsDialog::updateAssetControlState(CCoinControl& ctrl)
     // Avoid using global defaults when sending money from the GUI
     // Either custom fee will be used or if not selected, the confirmation target from dropdown box
     ctrl.m_confirm_target = getConfTargetForIndex(ui->confTargetSelector->currentIndex());
-//    ctrl.signalRbf = ui->optInRBF->isChecked();
 }
 
 void AssetsDialog::updateSmartFeeLabel()
@@ -792,9 +682,9 @@ void AssetsDialog::updateSmartFeeLabel()
     updateAssetControlState(coin_control);
     coin_control.m_feerate.reset(); // Explicitly use only fee estimation rate for smart fee labels
     FeeCalculation feeCalc;
-    CFeeRate feeRate = CFeeRate(GetMinimumFee(1000, coin_control, ::mempool, ::feeEstimator, &feeCalc));
+    CFeeRate feeRate = CFeeRate(CWallet::GetMinimumFee(1000, coin_control, ::mempool, ::feeEstimator, &feeCalc));
 
-    ui->labelSmartFee->setText(NeoxaUnits::formatWithUnit(model->getOptionsModel()->getDisplayUnit(), feeRate.GetFeePerK()) + "/kB");
+    ui->labelSmartFee->setText(BitcoinUnits::formatWithUnit(model->getOptionsModel()->getDisplayUnit(), feeRate.GetFeePerK()) + "/kB");
 
     if (feeCalc.reason == FeeReason::FALLBACK) {
         ui->labelSmartFee2->show(); // (Smart fee not initialized yet. This usually takes a few blocks...)
@@ -803,11 +693,11 @@ void AssetsDialog::updateSmartFeeLabel()
         int lightness = ui->fallbackFeeWarningLabel->palette().color(QPalette::WindowText).lightness();
         QColor warning_colour(255 - (lightness / 5), 176 - (lightness / 3), 48 - (lightness / 14));
         ui->fallbackFeeWarningLabel->setStyleSheet("QLabel { color: " + warning_colour.name() + "; }");
-        #ifndef QTversionPreFiveEleven
-			ui->fallbackFeeWarningLabel->setIndent(QFontMetrics(ui->fallbackFeeWarningLabel->font()).horizontalAdvance("x"));
-		#else
+        //#ifndef QTversionPreFiveEleven
+		//	ui->fallbackFeeWarningLabel->setIndent(QFontMetrics(ui->fallbackFeeWarningLabel->font()).horizontalAdvance("x"));
+		//#else
 			ui->fallbackFeeWarningLabel->setIndent(QFontMetrics(ui->fallbackFeeWarningLabel->font()).width("x"));
-		#endif
+		//#endif
     }
     else
     {
@@ -870,11 +760,6 @@ void AssetsDialog::assetControlFeatureChanged(bool checked)
         AssetControlDialog::assetControl->SetNull();
 
     assetControlUpdateLabels();
-}
-
-void AssetsDialog::customFeeFeatureChanged(bool checked)
-{
-    ui->frameFee->setVisible(checked);
 }
 
 // Coin Control: button inputs -> show actual coin control dialog
@@ -998,7 +883,7 @@ void AssetsDialog::assetControlUpdateLabels()
     }
 }
 
-/** NEOXA START */
+/** NEOX START */
 void AssetsDialog::assetControlUpdateSendCoinsDialog()
 {
     for(int i = 0; i < ui->entries->count(); ++i)
@@ -1036,7 +921,7 @@ void AssetsDialog::focusAsset(const QModelIndex &idx)
     {
         SendAssetsRecipient recipient;
         recipient.assetName = idx.data(AssetTableModel::AssetNameRole).toString();
-
+ 
         entry->setValue(recipient);
         entry->setFocus();
     }
@@ -1063,4 +948,4 @@ void AssetsDialog::handleFirstSelection()
         entry->refreshAssetList();
     }
 }
-/** NEOXA END */
+/** NEOX END */

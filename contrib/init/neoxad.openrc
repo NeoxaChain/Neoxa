@@ -1,42 +1,42 @@
-#!/sbin/runscript
+#!/sbin/openrc-run
 
 # backward compatibility for existing gentoo layout 
 #
-if [ -d "/var/lib/neoxa/.neoxa" ]; then
-	NEOXAD_DEFAULT_DATADIR="/var/lib/neoxa/.neoxa"
+if [ -d "/var/lib/neoxacore/.neoxacore" ]; then
+	BITCOIND_DEFAULT_DATADIR="/var/lib/neoxacore/.neoxacore"
 else
-	NEOXAD_DEFAULT_DATADIR="/var/lib/neoxad"
+	BITCOIND_DEFAULT_DATADIR="/var/lib/neoxad"
 fi
 
-NEOXAD_CONFIGFILE=${NEOXAD_CONFIGFILE:-/etc/neoxa/neoxa.conf}
-NEOXAD_PIDDIR=${NEOXAD_PIDDIR:-/var/run/neoxad}
-NEOXAD_PIDFILE=${NEOXAD_PIDFILE:-${NEOXAD_PIDDIR}/neoxad.pid}
-NEOXAD_DATADIR=${NEOXAD_DATADIR:-${NEOXAD_DEFAULT_DATADIR}}
-NEOXAD_USER=${NEOXAD_USER:-${NEOXA_USER:-neoxa}}
-NEOXAD_GROUP=${NEOXAD_GROUP:-neoxa}
-NEOXAD_BIN=${NEOXAD_BIN:-/usr/bin/neoxad}
-NEOXAD_NICE=${NEOXAD_NICE:-${NICELEVEL:-0}}
-NEOXAD_OPTS="${NEOXAD_OPTS:-${NEOXA_OPTS}}"
+BITCOIND_CONFIGFILE=${BITCOIND_CONFIGFILE:-/etc/neoxacore/neoxa.conf}
+BITCOIND_PIDDIR=${BITCOIND_PIDDIR:-/var/run/neoxad}
+BITCOIND_PIDFILE=${BITCOIND_PIDFILE:-${BITCOIND_PIDDIR}/neoxad.pid}
+BITCOIND_DATADIR=${BITCOIND_DATADIR:-${BITCOIND_DEFAULT_DATADIR}}
+BITCOIND_USER=${BITCOIND_USER:-${BITCOIN_USER:-neoxacore}}
+BITCOIND_GROUP=${BITCOIND_GROUP:-neoxacore}
+BITCOIND_BIN=${BITCOIND_BIN:-/usr/bin/neoxad}
+BITCOIND_NICE=${BITCOIND_NICE:-${NICELEVEL:-0}}
+BITCOIND_OPTS="${BITCOIND_OPTS:-${BITCOIN_OPTS}}"
 
 name="Neoxa Core Daemon"
 description="Neoxa cryptocurrency P2P network daemon"
 
 command="/usr/bin/neoxad"
-command_args="-pid=\"${NEOXAD_PIDFILE}\" \
-		-conf=\"${NEOXAD_CONFIGFILE}\" \
-		-datadir=\"${NEOXAD_DATADIR}\" \
+command_args="-pid=\"${BITCOIND_PIDFILE}\" \
+		-conf=\"${BITCOIND_CONFIGFILE}\" \
+		-datadir=\"${BITCOIND_DATADIR}\" \
 		-daemon \
-		${NEOXAD_OPTS}"
+		${BITCOIND_OPTS}"
 
-required_files="${NEOXAD_CONFIGFILE}"
-start_stop_daemon_args="-u ${NEOXAD_USER} \
-			-N ${NEOXAD_NICE} -w 2000"
-pidfile="${NEOXAD_PIDFILE}"
+required_files="${BITCOIND_CONFIGFILE}"
+start_stop_daemon_args="-u ${BITCOIND_USER} \
+			-N ${BITCOIND_NICE} -w 2000"
+pidfile="${BITCOIND_PIDFILE}"
 
 # The retry schedule to use when stopping the daemon. Could be either
 # a timeout in seconds or multiple signal/timeout pairs (like
 # "SIGKILL/180 SIGTERM/300")
-retry="${NEOXAD_SIGTERM_TIMEOUT}"
+retry="${BITCOIND_SIGTERM_TIMEOUT}"
 
 depend() {
 	need localmount net
@@ -50,29 +50,29 @@ start_pre() {
 	checkpath \
 	-d \
 	--mode 0750 \
-	--owner "${NEOXAD_USER}:${NEOXAD_GROUP}" \
-	"${NEOXAD_DATADIR}"
+	--owner "${BITCOIND_USER}:${BITCOIND_GROUP}" \
+	"${BITCOIND_DATADIR}"
 
 	checkpath \
 	-d \
 	--mode 0755 \
-	--owner "${NEOXAD_USER}:${NEOXAD_GROUP}" \
-	"${NEOXAD_PIDDIR}"
+	--owner "${BITCOIND_USER}:${BITCOIND_GROUP}" \
+	"${BITCOIND_PIDDIR}"
 
 	checkpath -f \
-	-o ${NEOXAD_USER}:${NEOXAD_GROUP} \
+	-o ${BITCOIND_USER}:${BITCOIND_GROUP} \
 	-m 0660 \
-	${NEOXAD_CONFIGFILE}
+	${BITCOIND_CONFIGFILE}
 
 	checkconfig || return 1
 }
 
 checkconfig()
 {
-	if ! grep -qs '^rpcpassword=' "${NEOXAD_CONFIGFILE}" ; then
+	if ! grep -qs '^rpcpassword=' "${BITCOIND_CONFIGFILE}" ; then
 		eerror ""
 		eerror "ERROR: You must set a secure rpcpassword to run neoxad."
-		eerror "The setting must appear in ${NEOXAD_CONFIGFILE}"
+		eerror "The setting must appear in ${BITCOIND_CONFIGFILE}"
 		eerror ""
 		eerror "This password is security critical to securing wallets "
 		eerror "and must not be the same as the rpcuser setting."
@@ -84,7 +84,7 @@ checkconfig()
 		eerror "It is recommended that you also set alertnotify so you are "
 		eerror "notified of problems:"
 		eerror ""
-		eerror "ie: alertnotify=echo %%s | mail -s \"Neoxa Alert\"" \
+		eerror "ie: alertnotify=echo %%s | mail -s \"Neoxa Core Alert\"" \
 			"admin@foo.com"
 		eerror ""
 		return 1

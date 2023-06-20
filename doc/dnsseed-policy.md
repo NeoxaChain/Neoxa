@@ -43,12 +43,11 @@ related to the DNS seed operation.
 
 If these expectations cannot be satisfied the operator should
 discontinue providing services and contact the active Neoxa
-Core development team as well as posting on
-[neoxa-dev](https://lists.linuxfoundation.org/mailman/listinfo/neoxa-dev).
+Core development team.
 
 Behavior outside of these expectations may be reasonable in some
 situations but should be discussed in public in advance.
 
 See also
 ----------
-- [neoxa-seeder](https://github.com/sipa/neoxa-seeder) is a reference implementation of a DNS seed.
+- [neoxa-seeder](https://github.com/nightlyThe-Neoxa-Endeavor/neoxa-seeder) is a reference implementation of a DNS seed.

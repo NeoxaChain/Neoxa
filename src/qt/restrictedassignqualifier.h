@@ -1,9 +1,9 @@
-// Copyright (c) 2019 The OLDNAMENEEDKEEP__Core developers
+// Copyright (c) 2019 The Raven Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef NEOXA_QT_ASSIGNQUALIFIER_H
-#define NEOXA_QT_ASSIGNQUALIFIER_H
+#ifndef RAVEN_QT_ASSIGNQUALIFIER_H
+#define RAVEN_QT_ASSIGNQUALIFIER_H
 
 #include "amount.h"
 
@@ -62,6 +62,7 @@ private Q_SLOTS:
     void check();
     void dataChanged();
     void changeAddressChanged(int);
+    void onClearButtonClicked();
 };
 
-#endif // NEOXA_QT_ASSIGNQUALIFIER_H
+#endif // RAVEN_QT_ASSIGNQUALIFIER_H

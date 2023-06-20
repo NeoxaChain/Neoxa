@@ -6,14 +6,10 @@
 
 #include <string>
 
-/**
- * Filter that generates and validates UTF-8, as well as collates UTF-16
- * surrogate pairs as specified in RFC4627.
- */
 class JSONUTF8StringFilter
 {
 public:
-    explicit JSONUTF8StringFilter(std::string &s):
+    JSONUTF8StringFilter(std::string &s):
         str(s), is_valid(true), codepoint(0), state(0), surpair(0)
     {
     }
@@ -46,27 +42,28 @@ public:
         }
     }
     // Write codepoint directly, possibly collating surrogate pairs
-    void push_back_u(unsigned int codepoint_)
+    void push_back_u(unsigned int codepoint)
     {
-        if (state) // Only accept full codepoints in open state
+        // Only accept full codepoints in open state
+        if (state)
             is_valid = false;
-        if (codepoint_ >= 0xD800 && codepoint_ < 0xDC00) { // First half of surrogate pair
+        if (codepoint >= 0xD800 && codepoint < 0xDC00) { // First half of surrogate pair
             if (surpair) // Two subsequent surrogate pair openers - fail
                 is_valid = false;
             else
-                surpair = codepoint_;
-        } else if (codepoint_ >= 0xDC00 && codepoint_ < 0xE000) { // Second half of surrogate pair
+                surpair = codepoint;
+        } else if (codepoint >= 0xDC00 && codepoint < 0xE000) { // Second half of surrogate pair
             if (surpair) { // Open surrogate pair, expect second half
                 // Compute code point from UTF-16 surrogate pair
-                append_codepoint(0x10000 | ((surpair - 0xD800)<<10) | (codepoint_ - 0xDC00));
+                append_codepoint(0x10000 | ((surpair - 0xD800)<<10) | (codepoint - 0xDC00));
                 surpair = 0;
-            } else // Second half doesn't follow a first half - fail
+            } else // First half of surrogate pair not followed by second
                 is_valid = false;
         } else {
-            if (surpair) // First half of surrogate pair not followed by second - fail
+            if (surpair) // First half of surrogate pair not followed by second
                 is_valid = false;
             else
-                append_codepoint(codepoint_);
+                append_codepoint(codepoint);
         }
     }
     // Check that we're in a state where the string can be ended
@@ -83,9 +80,7 @@ private:
     // Current UTF-8 decoding state
     unsigned int codepoint;
     int state; // Top bit to be filled in for next UTF-8 byte, or 0
-
-    // Keep track of the following state to handle the following section of
-    // RFC4627:
+    // Keep track of this state to handle the following section of RFC4627:
     //
     //    To escape an extended character that is not in the Basic Multilingual
     //    Plane, the character is represented as a twelve-character sequence,
@@ -94,24 +89,24 @@ private:
     //    "\uD834\uDD1E".
     //
     //  Two subsequent \u.... may have to be replaced with one actual codepoint.
-    unsigned int surpair; // First half of open UTF-16 surrogate pair, or 0
+    unsigned int surpair; // First of UTF-16 surrogate pair
 
-    void append_codepoint(unsigned int codepoint_)
+    void append_codepoint(unsigned int codepoint)
     {
-        if (codepoint_ <= 0x7f)
-            str.push_back((char)codepoint_);
-        else if (codepoint_ <= 0x7FF) {
-            str.push_back((char)(0xC0 | (codepoint_ >> 6)));
-            str.push_back((char)(0x80 | (codepoint_ & 0x3F)));
-        } else if (codepoint_ <= 0xFFFF) {
-            str.push_back((char)(0xE0 | (codepoint_ >> 12)));
-            str.push_back((char)(0x80 | ((codepoint_ >> 6) & 0x3F)));
-            str.push_back((char)(0x80 | (codepoint_ & 0x3F)));
-        } else if (codepoint_ <= 0x1FFFFF) {
-            str.push_back((char)(0xF0 | (codepoint_ >> 18)));
-            str.push_back((char)(0x80 | ((codepoint_ >> 12) & 0x3F)));
-            str.push_back((char)(0x80 | ((codepoint_ >> 6) & 0x3F)));
-            str.push_back((char)(0x80 | (codepoint_ & 0x3F)));
+        if (codepoint <= 0x7f)
+            str.push_back((char)codepoint);
+        else if (codepoint <= 0x7FF) {
+            str.push_back((char)(0xC0 | (codepoint >> 6)));
+            str.push_back((char)(0x80 | (codepoint & 0x3F)));
+        } else if (codepoint <= 0xFFFF) {
+            str.push_back((char)(0xE0 | (codepoint >> 12)));
+            str.push_back((char)(0x80 | ((codepoint >> 6) & 0x3F)));
+            str.push_back((char)(0x80 | (codepoint & 0x3F)));
+        } else if (codepoint <= 0x1FFFFF) {
+            str.push_back((char)(0xF0 | (codepoint >> 18)));
+            str.push_back((char)(0x80 | ((codepoint >> 12) & 0x3F)));
+            str.push_back((char)(0x80 | ((codepoint >> 6) & 0x3F)));
+            str.push_back((char)(0x80 | (codepoint & 0x3F)));
         }
     }
 };

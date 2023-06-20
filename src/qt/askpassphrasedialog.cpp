@@ -1,6 +1,6 @@
-// Copyright (c) 2011-2016 The Bitcoin Core developers
-// Copyright (c) 2017-2019 The Raven Core developers
-// Copyright (c) 2020-2021 The Neoxa Core developers
+// Copyright (c) 2011-2015 The Bitcoin Core developers
+// Copyright (c) 2014-2019 The Dash Core developers
+// Copyright (c) 2020 The Neoxa developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -44,6 +44,20 @@ AskPassphraseDialog::AskPassphraseDialog(Mode _mode, QWidget *parent) :
 
     switch(mode)
     {
+        case Encrypt: // Ask passphrase x2
+            ui->warningLabel->setText(tr("Enter the new passphrase to the wallet.<br/>Please use a passphrase of <b>ten or more random characters</b>, or <b>eight or more words</b>."));
+            ui->passLabel1->hide();
+            ui->passEdit1->hide();
+            setWindowTitle(tr("Encrypt wallet"));
+            break;
+        case UnlockMixing:
+            ui->warningLabel->setText(tr("This operation needs your wallet passphrase to unlock the wallet."));
+            ui->passLabel2->hide();
+            ui->passEdit2->hide();
+            ui->passLabel3->hide();
+            ui->passEdit3->hide();
+            setWindowTitle(tr("Unlock wallet for mixing only"));
+            break;
         case Unlock: // Ask passphrase
             ui->warningLabel->setText(tr("This operation needs your wallet passphrase to unlock the wallet."));
             ui->passLabel2->hide();
@@ -100,8 +114,70 @@ void AskPassphraseDialog::accept()
 
     switch(mode)
     {
+    case Encrypt: {
+        if(newpass1.empty() || newpass2.empty())
+        {
+            // Cannot encrypt with empty passphrase
+            break;
+        }
+        QMessageBox::StandardButton retval = QMessageBox::question(this, tr("Confirm wallet encryption"),
+                 tr("Warning: If you encrypt your wallet and lose your passphrase, you will <b>LOSE ALL OF YOUR NEOX</b>!") + "<br><br>" + tr("Are you sure you wish to encrypt your wallet?"),
+                 QMessageBox::Yes|QMessageBox::Cancel,
+                 QMessageBox::Cancel);
+        if(retval == QMessageBox::Yes)
+        {
+            if(newpass1 == newpass2)
+            {
+                if(model->setWalletEncrypted(true, newpass1))
+                {
+                    if (model->hdEnabled()) {
+                        QMessageBox::warning(this, tr("Wallet encrypted"),
+                                         "<qt>" +
+                                         tr("%1 will close now to finish the encryption process. "
+                                         "Remember that encrypting your wallet cannot fully protect "
+                                         "your funds from being stolen by malware infecting your computer.").arg(tr(PACKAGE_NAME)) +
+                                         "<br><br><b>" +
+                                         tr("IMPORTANT: Any previous backups you have made of your wallet file "
+                                         "should be replaced with the newly generated, encrypted wallet file. "
+                                         "Previous backups of the unencrypted wallet file contain the same HD seed and "
+                                         "still have full access to all your funds just like the new, encrypted wallet.") +
+                                         "</b></qt>");
+                    } else {
+                        QMessageBox::warning(this, tr("Wallet encrypted"),
+                                         "<qt>" +
+                                         tr("%1 will close now to finish the encryption process. "
+                                         "Remember that encrypting your wallet cannot fully protect "
+                                         "your funds from being stolen by malware infecting your computer.").arg(tr(PACKAGE_NAME)) +
+                                         "<br><br><b>" +
+                                         tr("IMPORTANT: Any previous backups you have made of your wallet file "
+                                         "should be replaced with the newly generated, encrypted wallet file. "
+                                         "For security reasons, previous backups of the unencrypted wallet file "
+                                         "will become useless as soon as you start using the new, encrypted wallet.") +
+                                         "</b></qt>");
+                    }
+                    QApplication::quit();
+                }
+                else
+                {
+                    QMessageBox::critical(this, tr("Wallet encryption failed"),
+                                         tr("Wallet encryption failed due to an internal error. Your wallet was not encrypted."));
+                }
+                QDialog::accept(); // Success
+            }
+            else
+            {
+                QMessageBox::critical(this, tr("Wallet encryption failed"),
+                                     tr("The supplied passphrases do not match."));
+            }
+        }
+        else
+        {
+            QDialog::reject(); // Cancelled
+        }
+        } break;
+    case UnlockMixing:
     case Unlock:
-        if(!model->setWalletLocked(false, oldpass))
+        if(!model->setWalletLocked(false, oldpass, mode == UnlockMixing))
         {
             QMessageBox::critical(this, tr("Wallet unlock failed"),
                                   tr("The passphrase entered for the wallet decryption was incorrect."));
@@ -152,6 +228,10 @@ void AskPassphraseDialog::textChanged()
     bool acceptable = false;
     switch(mode)
     {
+    case Encrypt: // New passphrase x2
+        acceptable = !ui->passEdit2->text().isEmpty() && !ui->passEdit3->text().isEmpty();
+        break;
+    case UnlockMixing: // Old passphrase x1
     case Unlock: // Old passphrase x1
     case Decrypt:
         acceptable = !ui->passEdit1->text().isEmpty();

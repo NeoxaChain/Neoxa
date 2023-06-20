@@ -1,6 +1,4 @@
-// Copyright (c) 2012-2016 The Bitcoin Core developers
-// Copyright (c) 2017-2019 The Raven Core developers
-// Copyright (c) 2020-2021 The Neoxa Core developers
+// Copyright (c) 2012-2015 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -9,20 +7,19 @@
 #include "consensus/consensus.h"
 #include "memusage.h"
 #include "random.h"
-#include "util.h"
-#include "validation.h"
-#include "tinyformat.h"
-#include "base58.h"
 
 #include <assert.h>
 #include <assets/assets.h>
 #include <wallet/wallet.h>
+#include <chainparams.h>
+#include <validation.h>
+#include <base58.h>
 
 bool CCoinsView::GetCoin(const COutPoint &outpoint, Coin &coin) const { return false; }
 uint256 CCoinsView::GetBestBlock() const { return uint256(); }
 std::vector<uint256> CCoinsView::GetHeadBlocks() const { return std::vector<uint256>(); }
 bool CCoinsView::BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock) { return false; }
-CCoinsViewCursor *CCoinsView::Cursor() const { return nullptr; }
+CCoinsViewCursor *CCoinsView::Cursor() const { return 0; }
 
 bool CCoinsView::HaveCoin(const COutPoint &outpoint) const
 {
@@ -98,15 +95,13 @@ void CCoinsViewCache::AddCoin(const COutPoint &outpoint, Coin&& coin, bool possi
 void AddCoins(CCoinsViewCache& cache, const CTransaction &tx, int nHeight, uint256 blockHash, bool check, CAssetsCache* assetsCache, std::pair<std::string, CBlockAssetUndo>* undoAssetData) {
     bool fCoinbase = tx.IsCoinBase();
     const uint256& txid = tx.GetHash();
-
-    /** NEOXA START */
+    /** NEOX ASSETS START */
     if (AreAssetsDeployed()) {
-        if (assetsCache) {
+        if (assetsCache) {  
             if (tx.IsNewAsset()) { // This works are all new root assets, sub asset, and restricted assets
                 CNewAsset asset;
                 std::string strAddress;
                 AssetFromTransaction(tx, asset, strAddress);
-
                 std::string ownerName;
                 std::string ownerAddress;
                 OwnerFromTransaction(tx, ownerName, ownerAddress);
@@ -114,12 +109,12 @@ void AddCoins(CCoinsViewCache& cache, const CTransaction &tx, int nHeight, uint2
                 // Add the new asset to cache
                 if (!assetsCache->AddNewAsset(asset, strAddress, nHeight, blockHash))
                     error("%s : Failed at adding a new asset to our cache. asset: %s", __func__,
-                          asset.strName);
+                        asset.strName);
 
                 // Add the owner asset to cache
                 if (!assetsCache->AddOwnerAsset(ownerName, ownerAddress))
                     error("%s : Failed at adding a new asset to our cache. asset: %s", __func__,
-                          asset.strName);
+                        asset.strName);
 
             } else if (tx.IsReissueAsset()) {
                 CReissueAsset reissue;
@@ -185,7 +180,7 @@ void AddCoins(CCoinsViewCache& cache, const CTransaction &tx, int nHeight, uint2
                 // If any of the following items were changed by reissuing, we need to database the old values so it can be undone correctly
                 if (fIPFSChanged || fUnitsChanged || fVerifierChanged) {
                     undoAssetData->first = reissue.strName; // Asset Name
-                    undoAssetData->second = CBlockAssetUndo {fIPFSChanged, fUnitsChanged, asset.strIPFSHash, asset.units, ASSET_UNDO_INCLUDES_VERIFIER_STRING, fVerifierChanged, strOldVerifier}; // ipfschanged, unitchanged, Old Assets IPFSHash, old units
+                    undoAssetData->second = CBlockAssetUndo {fIPFSChanged, fUnitsChanged, asset.strIPFSHash, asset.units}; // ipfschanged, unitchanged, Old Assets IPFSHash, old units
                 }
             } else if (tx.IsNewUniqueAsset()) {
                 for (int n = 0; n < (int)tx.vout.size(); n++) {
@@ -200,7 +195,7 @@ void AddCoins(CCoinsViewCache& cache, const CTransaction &tx, int nHeight, uint2
                         // Add the new asset to cache
                         if (!assetsCache->AddNewAsset(asset, strAddress, nHeight, blockHash))
                             error("%s : Failed at adding a new asset to our cache. asset: %s", __func__,
-                                  asset.strName);
+                                asset.strName);
                     }
                 }
             } else if (tx.IsNewMsgChannelAsset()) {
@@ -249,18 +244,18 @@ void AddCoins(CCoinsViewCache& cache, const CTransaction &tx, int nHeight, uint2
                         break;
                     }
                 }
-            }
+            }    
         }
     }
-    /** NEOXA END */
+    /** NEOX ASSETS END */
 
     for (size_t i = 0; i < tx.vout.size(); ++i) {
         bool overwrite = check ? cache.HaveCoin(COutPoint(txid, i)) : fCoinbase;
         // Always set the possible_overwrite flag to AddCoin for coinbase txn, in order to correctly
         // deal with the pre-BIP30 occurrences of duplicate coinbase transactions.
         cache.AddCoin(COutPoint(txid, i), Coin(tx.vout[i], nHeight, fCoinbase), overwrite);
-
-        /** NEOXA START */
+    
+        /** NEOX ASSETS START */
         if (AreAssetsDeployed()) {
             if (assetsCache) {
                 CAssetOutputEntry assetData;
@@ -353,21 +348,17 @@ void AddCoins(CCoinsViewCache& cache, const CTransaction &tx, int nHeight, uint2
                 }
             }
         }
-        /** NEOXA END */
+        /** NEOX ASSETS END */
     }
 }
 
 bool CCoinsViewCache::SpendCoin(const COutPoint &outpoint, Coin* moveout, CAssetsCache* assetsCache) {
-
     CCoinsMap::iterator it = FetchCoin(outpoint);
-    if (it == cacheCoins.end())
-        return false;
+    if (it == cacheCoins.end()) return false;
     cachedCoinsUsage -= it->second.coin.DynamicMemoryUsage();
-
-    /** NEOXA START */
+    /** NEOX START */
     Coin tempCoin = it->second.coin;
-    /** NEOXA END */
-
+    /** NEOX END */
     if (moveout) {
         *moveout = std::move(it->second.coin);
     }
@@ -377,8 +368,7 @@ bool CCoinsViewCache::SpendCoin(const COutPoint &outpoint, Coin* moveout, CAsset
         it->second.flags |= CCoinsCacheEntry::DIRTY;
         it->second.coin.Clear();
     }
-
-    /** NEOXA START */
+    /** NEOX START */
     if (AreAssetsDeployed()) {
         if (assetsCache) {
             if (!assetsCache->TrySpendCoin(outpoint, tempCoin.out)) {
@@ -386,8 +376,7 @@ bool CCoinsViewCache::SpendCoin(const COutPoint &outpoint, Coin* moveout, CAsset
             }
         }
     }
-    /** NEOXA END */
-
+    /** NEOX END */
     return true;
 }
 
@@ -523,7 +512,7 @@ bool CCoinsViewCache::HaveInputs(const CTransaction& tx) const
 }
 
 static const size_t MIN_TRANSACTION_OUTPUT_WEIGHT = WITNESS_SCALE_FACTOR * ::GetSerializeSize(CTxOut(), SER_NETWORK, PROTOCOL_VERSION);
-//static const size_t MAX_OUTPUTS_PER_BLOCK = MAX_BLOCK_WEIGHT / MIN_TRANSACTION_OUTPUT_WEIGHT;
+//static const size_t MAX_OUTPUTS_PER_BLOCK = MaxBlockSize(true) /  ::GetSerializeSize(CTxOut(), SER_NETWORK, PROTOCOL_VERSION); // TODO: merge with similar definition in undo.h.
 
 const Coin& AccessByTxid(const CCoinsViewCache& view, const uint256& txid)
 {

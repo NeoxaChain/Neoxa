@@ -1,16 +1,12 @@
 #!/usr/bin/env python3
 # Copyright (c) 2014-2016 The Bitcoin Core developers
-# Copyright (c) 2017-2019 The Raven Core developers
-# Copyright (c) 2020-2021 The Neoxa Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-
 """Test the importmulti RPC."""
+from test_framework.test_framework import BitcoinTestFramework
+from test_framework.util import *
 
-from test_framework.test_framework import NeoxaTestFramework
-from test_framework.util import assert_equal, assert_greater_than, assert_raises_rpc_error
-
-class ImportMultiTest (NeoxaTestFramework):
+class ImportMultiTest (BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 2
         self.setup_clean_chain = True
@@ -24,7 +20,7 @@ class ImportMultiTest (NeoxaTestFramework):
         self.nodes[1].generate(1)
         timestamp = self.nodes[1].getblock(self.nodes[1].getbestblockhash())['mediantime']
 
-        node0_address1 = self.nodes[0].validateaddress(self.nodes[0].getnewaddress())
+        node0_address1 = self.nodes[0].getaddressinfo(self.nodes[0].getnewaddress())
 
         #Check only one address
         assert_equal(node0_address1['ismine'], True)
@@ -33,16 +29,16 @@ class ImportMultiTest (NeoxaTestFramework):
         assert_equal(self.nodes[1].getblockcount(),1)
 
         #Address Test - before import
-        address_info = self.nodes[1].validateaddress(node0_address1['address'])
+        address_info = self.nodes[1].getaddressinfo(node0_address1['address'])
         assert_equal(address_info['iswatchonly'], False)
         assert_equal(address_info['ismine'], False)
 
 
         # RPC importmulti -----------------------------------------------
 
-        # Neoxa Address
+        # Bitcoin Address
         self.log.info("Should import an address")
-        address = self.nodes[0].validateaddress(self.nodes[0].getnewaddress())
+        address = self.nodes[0].getaddressinfo(self.nodes[0].getnewaddress())
         result = self.nodes[1].importmulti([{
             "scriptPubKey": {
                 "address": address['address']
@@ -50,7 +46,7 @@ class ImportMultiTest (NeoxaTestFramework):
             "timestamp": "now",
         }])
         assert_equal(result[0]['success'], True)
-        address_assert = self.nodes[1].validateaddress(address['address'])
+        address_assert = self.nodes[1].getaddressinfo(address['address'])
         assert_equal(address_assert['iswatchonly'], True)
         assert_equal(address_assert['ismine'], False)
         assert_equal(address_assert['timestamp'], timestamp)
@@ -70,21 +66,21 @@ class ImportMultiTest (NeoxaTestFramework):
 
         # ScriptPubKey + internal
         self.log.info("Should import a scriptPubKey with internal flag")
-        address = self.nodes[0].validateaddress(self.nodes[0].getnewaddress())
+        address = self.nodes[0].getaddressinfo(self.nodes[0].getnewaddress())
         result = self.nodes[1].importmulti([{
             "scriptPubKey": address['scriptPubKey'],
             "timestamp": "now",
             "internal": True
         }])
         assert_equal(result[0]['success'], True)
-        address_assert = self.nodes[1].validateaddress(address['address'])
+        address_assert = self.nodes[1].getaddressinfo(address['address'])
         assert_equal(address_assert['iswatchonly'], True)
         assert_equal(address_assert['ismine'], False)
         assert_equal(address_assert['timestamp'], timestamp)
 
         # ScriptPubKey + !internal
         self.log.info("Should not import a scriptPubKey without internal flag")
-        address = self.nodes[0].validateaddress(self.nodes[0].getnewaddress())
+        address = self.nodes[0].getaddressinfo(self.nodes[0].getnewaddress())
         result = self.nodes[1].importmulti([{
             "scriptPubKey": address['scriptPubKey'],
             "timestamp": "now",
@@ -92,7 +88,7 @@ class ImportMultiTest (NeoxaTestFramework):
         assert_equal(result[0]['success'], False)
         assert_equal(result[0]['error']['code'], -8)
         assert_equal(result[0]['error']['message'], 'Internal must be set for hex scriptPubKey')
-        address_assert = self.nodes[1].validateaddress(address['address'])
+        address_assert = self.nodes[1].getaddressinfo(address['address'])
         assert_equal(address_assert['iswatchonly'], False)
         assert_equal(address_assert['ismine'], False)
         assert_equal('timestamp' in address_assert, False)
@@ -100,7 +96,7 @@ class ImportMultiTest (NeoxaTestFramework):
 
         # Address + Public key + !Internal
         self.log.info("Should import an address with public key")
-        address = self.nodes[0].validateaddress(self.nodes[0].getnewaddress())
+        address = self.nodes[0].getaddressinfo(self.nodes[0].getnewaddress())
         result = self.nodes[1].importmulti([{
             "scriptPubKey": {
                 "address": address['address']
@@ -109,7 +105,7 @@ class ImportMultiTest (NeoxaTestFramework):
             "pubkeys": [ address['pubkey'] ]
         }])
         assert_equal(result[0]['success'], True)
-        address_assert = self.nodes[1].validateaddress(address['address'])
+        address_assert = self.nodes[1].getaddressinfo(address['address'])
         assert_equal(address_assert['iswatchonly'], True)
         assert_equal(address_assert['ismine'], False)
         assert_equal(address_assert['timestamp'], timestamp)
@@ -117,7 +113,7 @@ class ImportMultiTest (NeoxaTestFramework):
 
         # ScriptPubKey + Public key + internal
         self.log.info("Should import a scriptPubKey with internal and with public key")
-        address = self.nodes[0].validateaddress(self.nodes[0].getnewaddress())
+        address = self.nodes[0].getaddressinfo(self.nodes[0].getnewaddress())
         request = [{
             "scriptPubKey": address['scriptPubKey'],
             "timestamp": "now",
@@ -126,14 +122,14 @@ class ImportMultiTest (NeoxaTestFramework):
         }]
         result = self.nodes[1].importmulti(request)
         assert_equal(result[0]['success'], True)
-        address_assert = self.nodes[1].validateaddress(address['address'])
+        address_assert = self.nodes[1].getaddressinfo(address['address'])
         assert_equal(address_assert['iswatchonly'], True)
         assert_equal(address_assert['ismine'], False)
         assert_equal(address_assert['timestamp'], timestamp)
 
         # ScriptPubKey + Public key + !internal
         self.log.info("Should not import a scriptPubKey without internal and with public key")
-        address = self.nodes[0].validateaddress(self.nodes[0].getnewaddress())
+        address = self.nodes[0].getaddressinfo(self.nodes[0].getnewaddress())
         request = [{
             "scriptPubKey": address['scriptPubKey'],
             "timestamp": "now",
@@ -143,14 +139,14 @@ class ImportMultiTest (NeoxaTestFramework):
         assert_equal(result[0]['success'], False)
         assert_equal(result[0]['error']['code'], -8)
         assert_equal(result[0]['error']['message'], 'Internal must be set for hex scriptPubKey')
-        address_assert = self.nodes[1].validateaddress(address['address'])
+        address_assert = self.nodes[1].getaddressinfo(address['address'])
         assert_equal(address_assert['iswatchonly'], False)
         assert_equal(address_assert['ismine'], False)
         assert_equal('timestamp' in address_assert, False)
 
         # Address + Private key + !watchonly
         self.log.info("Should import an address with private key")
-        address = self.nodes[0].validateaddress(self.nodes[0].getnewaddress())
+        address = self.nodes[0].getaddressinfo(self.nodes[0].getnewaddress())
         result = self.nodes[1].importmulti([{
             "scriptPubKey": {
                 "address": address['address']
@@ -159,7 +155,7 @@ class ImportMultiTest (NeoxaTestFramework):
             "keys": [ self.nodes[0].dumpprivkey(address['address']) ]
         }])
         assert_equal(result[0]['success'], True)
-        address_assert = self.nodes[1].validateaddress(address['address'])
+        address_assert = self.nodes[1].getaddressinfo(address['address'])
         assert_equal(address_assert['iswatchonly'], False)
         assert_equal(address_assert['ismine'], True)
         assert_equal(address_assert['timestamp'], timestamp)
@@ -178,7 +174,7 @@ class ImportMultiTest (NeoxaTestFramework):
 
         # Address + Private key + watchonly
         self.log.info("Should not import an address with private key and with watchonly")
-        address = self.nodes[0].validateaddress(self.nodes[0].getnewaddress())
+        address = self.nodes[0].getaddressinfo(self.nodes[0].getnewaddress())
         result = self.nodes[1].importmulti([{
             "scriptPubKey": {
                 "address": address['address']
@@ -190,14 +186,14 @@ class ImportMultiTest (NeoxaTestFramework):
         assert_equal(result[0]['success'], False)
         assert_equal(result[0]['error']['code'], -8)
         assert_equal(result[0]['error']['message'], 'Incompatibility found between watchonly and keys')
-        address_assert = self.nodes[1].validateaddress(address['address'])
+        address_assert = self.nodes[1].getaddressinfo(address['address'])
         assert_equal(address_assert['iswatchonly'], False)
         assert_equal(address_assert['ismine'], False)
         assert_equal('timestamp' in address_assert, False)
 
         # ScriptPubKey + Private key + internal
         self.log.info("Should import a scriptPubKey with internal and with private key")
-        address = self.nodes[0].validateaddress(self.nodes[0].getnewaddress())
+        address = self.nodes[0].getaddressinfo(self.nodes[0].getnewaddress())
         result = self.nodes[1].importmulti([{
             "scriptPubKey": address['scriptPubKey'],
             "timestamp": "now",
@@ -205,14 +201,14 @@ class ImportMultiTest (NeoxaTestFramework):
             "internal": True
         }])
         assert_equal(result[0]['success'], True)
-        address_assert = self.nodes[1].validateaddress(address['address'])
+        address_assert = self.nodes[1].getaddressinfo(address['address'])
         assert_equal(address_assert['iswatchonly'], False)
         assert_equal(address_assert['ismine'], True)
         assert_equal(address_assert['timestamp'], timestamp)
 
         # ScriptPubKey + Private key + !internal
         self.log.info("Should not import a scriptPubKey without internal and with private key")
-        address = self.nodes[0].validateaddress(self.nodes[0].getnewaddress())
+        address = self.nodes[0].getaddressinfo(self.nodes[0].getnewaddress())
         result = self.nodes[1].importmulti([{
             "scriptPubKey": address['scriptPubKey'],
             "timestamp": "now",
@@ -221,17 +217,17 @@ class ImportMultiTest (NeoxaTestFramework):
         assert_equal(result[0]['success'], False)
         assert_equal(result[0]['error']['code'], -8)
         assert_equal(result[0]['error']['message'], 'Internal must be set for hex scriptPubKey')
-        address_assert = self.nodes[1].validateaddress(address['address'])
+        address_assert = self.nodes[1].getaddressinfo(address['address'])
         assert_equal(address_assert['iswatchonly'], False)
         assert_equal(address_assert['ismine'], False)
         assert_equal('timestamp' in address_assert, False)
 
 
         # P2SH address
-        sig_address_1 = self.nodes[0].validateaddress(self.nodes[0].getnewaddress())
-        sig_address_2 = self.nodes[0].validateaddress(self.nodes[0].getnewaddress())
-        sig_address_3 = self.nodes[0].validateaddress(self.nodes[0].getnewaddress())
-        multi_sig_script = self.nodes[0].createmultisig(2, [sig_address_1['address'], sig_address_2['address'], sig_address_3['pubkey']])
+        sig_address_1 = self.nodes[0].getaddressinfo(self.nodes[0].getnewaddress())
+        sig_address_2 = self.nodes[0].getaddressinfo(self.nodes[0].getnewaddress())
+        sig_address_3 = self.nodes[0].getaddressinfo(self.nodes[0].getnewaddress())
+        multi_sig_script = self.nodes[0].createmultisig(2, [sig_address_1['pubkey'], sig_address_2['pubkey'], sig_address_3['pubkey']])
         self.nodes[1].generate(100)
         self.nodes[1].sendtoaddress(multi_sig_script['address'], 10.00)
         self.nodes[1].generate(1)
@@ -245,20 +241,20 @@ class ImportMultiTest (NeoxaTestFramework):
             "timestamp": "now",
         }])
         assert_equal(result[0]['success'], True)
-        address_assert = self.nodes[1].validateaddress(multi_sig_script['address'])
+        address_assert = self.nodes[1].getaddressinfo(multi_sig_script['address'])
         assert_equal(address_assert['isscript'], True)
         assert_equal(address_assert['iswatchonly'], True)
         assert_equal(address_assert['timestamp'], timestamp)
-        p2sh_unspent = self.nodes[1].listunspent(0,999999, [multi_sig_script['address']])[0]
-        assert_equal(p2sh_unspent['spendable'], False)
-        assert_equal(p2sh_unspent['solvable'], False)
+        p2shunspent = self.nodes[1].listunspent(0,999999, [multi_sig_script['address']])[0]
+        assert_equal(p2shunspent['spendable'], False)
+        assert_equal(p2shunspent['solvable'], False)
 
 
         # P2SH + Redeem script
-        sig_address_1 = self.nodes[0].validateaddress(self.nodes[0].getnewaddress())
-        sig_address_2 = self.nodes[0].validateaddress(self.nodes[0].getnewaddress())
-        sig_address_3 = self.nodes[0].validateaddress(self.nodes[0].getnewaddress())
-        multi_sig_script = self.nodes[0].createmultisig(2, [sig_address_1['address'], sig_address_2['address'], sig_address_3['pubkey']])
+        sig_address_1 = self.nodes[0].getaddressinfo(self.nodes[0].getnewaddress())
+        sig_address_2 = self.nodes[0].getaddressinfo(self.nodes[0].getnewaddress())
+        sig_address_3 = self.nodes[0].getaddressinfo(self.nodes[0].getnewaddress())
+        multi_sig_script = self.nodes[0].createmultisig(2, [sig_address_1['pubkey'], sig_address_2['pubkey'], sig_address_3['pubkey']])
         self.nodes[1].generate(100)
         self.nodes[1].sendtoaddress(multi_sig_script['address'], 10.00)
         self.nodes[1].generate(1)
@@ -273,19 +269,19 @@ class ImportMultiTest (NeoxaTestFramework):
             "redeemscript": multi_sig_script['redeemScript']
         }])
         assert_equal(result[0]['success'], True)
-        address_assert = self.nodes[1].validateaddress(multi_sig_script['address'])
+        address_assert = self.nodes[1].getaddressinfo(multi_sig_script['address'])
         assert_equal(address_assert['timestamp'], timestamp)
 
-        p2sh_unspent = self.nodes[1].listunspent(0,999999, [multi_sig_script['address']])[0]
-        assert_equal(p2sh_unspent['spendable'], False)
-        assert_equal(p2sh_unspent['solvable'], True)
+        p2shunspent = self.nodes[1].listunspent(0,999999, [multi_sig_script['address']])[0]
+        assert_equal(p2shunspent['spendable'], False)
+        assert_equal(p2shunspent['solvable'], True)
 
 
         # P2SH + Redeem script + Private Keys + !Watchonly
-        sig_address_1 = self.nodes[0].validateaddress(self.nodes[0].getnewaddress())
-        sig_address_2 = self.nodes[0].validateaddress(self.nodes[0].getnewaddress())
-        sig_address_3 = self.nodes[0].validateaddress(self.nodes[0].getnewaddress())
-        multi_sig_script = self.nodes[0].createmultisig(2, [sig_address_1['address'], sig_address_2['address'], sig_address_3['pubkey']])
+        sig_address_1 = self.nodes[0].getaddressinfo(self.nodes[0].getnewaddress())
+        sig_address_2 = self.nodes[0].getaddressinfo(self.nodes[0].getnewaddress())
+        sig_address_3 = self.nodes[0].getaddressinfo(self.nodes[0].getnewaddress())
+        multi_sig_script = self.nodes[0].createmultisig(2, [sig_address_1['pubkey'], sig_address_2['pubkey'], sig_address_3['pubkey']])
         self.nodes[1].generate(100)
         self.nodes[1].sendtoaddress(multi_sig_script['address'], 10.00)
         self.nodes[1].generate(1)
@@ -301,18 +297,18 @@ class ImportMultiTest (NeoxaTestFramework):
             "keys": [ self.nodes[0].dumpprivkey(sig_address_1['address']), self.nodes[0].dumpprivkey(sig_address_2['address'])]
         }])
         assert_equal(result[0]['success'], True)
-        address_assert = self.nodes[1].validateaddress(multi_sig_script['address'])
+        address_assert = self.nodes[1].getaddressinfo(multi_sig_script['address'])
         assert_equal(address_assert['timestamp'], timestamp)
 
-        p2sh_unspent = self.nodes[1].listunspent(0,999999, [multi_sig_script['address']])[0]
-        assert_equal(p2sh_unspent['spendable'], False)
-        assert_equal(p2sh_unspent['solvable'], True)
+        p2shunspent = self.nodes[1].listunspent(0,999999, [multi_sig_script['address']])[0]
+        assert_equal(p2shunspent['spendable'], False)
+        assert_equal(p2shunspent['solvable'], True)
 
         # P2SH + Redeem script + Private Keys + Watchonly
-        sig_address_1 = self.nodes[0].validateaddress(self.nodes[0].getnewaddress())
-        sig_address_2 = self.nodes[0].validateaddress(self.nodes[0].getnewaddress())
-        sig_address_3 = self.nodes[0].validateaddress(self.nodes[0].getnewaddress())
-        multi_sig_script = self.nodes[0].createmultisig(2, [sig_address_1['address'], sig_address_2['address'], sig_address_3['pubkey']])
+        sig_address_1 = self.nodes[0].getaddressinfo(self.nodes[0].getnewaddress())
+        sig_address_2 = self.nodes[0].getaddressinfo(self.nodes[0].getnewaddress())
+        sig_address_3 = self.nodes[0].getaddressinfo(self.nodes[0].getnewaddress())
+        multi_sig_script = self.nodes[0].createmultisig(2, [sig_address_1['pubkey'], sig_address_2['pubkey'], sig_address_3['pubkey']])
         self.nodes[1].generate(100)
         self.nodes[1].sendtoaddress(multi_sig_script['address'], 10.00)
         self.nodes[1].generate(1)
@@ -335,8 +331,8 @@ class ImportMultiTest (NeoxaTestFramework):
 
         # Address + Public key + !Internal + Wrong pubkey
         self.log.info("Should not import an address with a wrong public key")
-        address = self.nodes[0].validateaddress(self.nodes[0].getnewaddress())
-        address2 = self.nodes[0].validateaddress(self.nodes[0].getnewaddress())
+        address = self.nodes[0].getaddressinfo(self.nodes[0].getnewaddress())
+        address2 = self.nodes[0].getaddressinfo(self.nodes[0].getnewaddress())
         result = self.nodes[1].importmulti([{
             "scriptPubKey": {
                 "address": address['address']
@@ -347,7 +343,7 @@ class ImportMultiTest (NeoxaTestFramework):
         assert_equal(result[0]['success'], False)
         assert_equal(result[0]['error']['code'], -5)
         assert_equal(result[0]['error']['message'], 'Consistency check failed')
-        address_assert = self.nodes[1].validateaddress(address['address'])
+        address_assert = self.nodes[1].getaddressinfo(address['address'])
         assert_equal(address_assert['iswatchonly'], False)
         assert_equal(address_assert['ismine'], False)
         assert_equal('timestamp' in address_assert, False)
@@ -355,8 +351,8 @@ class ImportMultiTest (NeoxaTestFramework):
 
         # ScriptPubKey + Public key + internal + Wrong pubkey
         self.log.info("Should not import a scriptPubKey with internal and with a wrong public key")
-        address = self.nodes[0].validateaddress(self.nodes[0].getnewaddress())
-        address2 = self.nodes[0].validateaddress(self.nodes[0].getnewaddress())
+        address = self.nodes[0].getaddressinfo(self.nodes[0].getnewaddress())
+        address2 = self.nodes[0].getaddressinfo(self.nodes[0].getnewaddress())
         request = [{
             "scriptPubKey": address['scriptPubKey'],
             "timestamp": "now",
@@ -367,7 +363,7 @@ class ImportMultiTest (NeoxaTestFramework):
         assert_equal(result[0]['success'], False)
         assert_equal(result[0]['error']['code'], -5)
         assert_equal(result[0]['error']['message'], 'Consistency check failed')
-        address_assert = self.nodes[1].validateaddress(address['address'])
+        address_assert = self.nodes[1].getaddressinfo(address['address'])
         assert_equal(address_assert['iswatchonly'], False)
         assert_equal(address_assert['ismine'], False)
         assert_equal('timestamp' in address_assert, False)
@@ -375,8 +371,8 @@ class ImportMultiTest (NeoxaTestFramework):
 
         # Address + Private key + !watchonly + Wrong private key
         self.log.info("Should not import an address with a wrong private key")
-        address = self.nodes[0].validateaddress(self.nodes[0].getnewaddress())
-        address2 = self.nodes[0].validateaddress(self.nodes[0].getnewaddress())
+        address = self.nodes[0].getaddressinfo(self.nodes[0].getnewaddress())
+        address2 = self.nodes[0].getaddressinfo(self.nodes[0].getnewaddress())
         result = self.nodes[1].importmulti([{
             "scriptPubKey": {
                 "address": address['address']
@@ -387,7 +383,7 @@ class ImportMultiTest (NeoxaTestFramework):
         assert_equal(result[0]['success'], False)
         assert_equal(result[0]['error']['code'], -5)
         assert_equal(result[0]['error']['message'], 'Consistency check failed')
-        address_assert = self.nodes[1].validateaddress(address['address'])
+        address_assert = self.nodes[1].getaddressinfo(address['address'])
         assert_equal(address_assert['iswatchonly'], False)
         assert_equal(address_assert['ismine'], False)
         assert_equal('timestamp' in address_assert, False)
@@ -395,8 +391,8 @@ class ImportMultiTest (NeoxaTestFramework):
 
         # ScriptPubKey + Private key + internal + Wrong private key
         self.log.info("Should not import a scriptPubKey with internal and with a wrong private key")
-        address = self.nodes[0].validateaddress(self.nodes[0].getnewaddress())
-        address2 = self.nodes[0].validateaddress(self.nodes[0].getnewaddress())
+        address = self.nodes[0].getaddressinfo(self.nodes[0].getnewaddress())
+        address2 = self.nodes[0].getaddressinfo(self.nodes[0].getnewaddress())
         result = self.nodes[1].importmulti([{
             "scriptPubKey": address['scriptPubKey'],
             "timestamp": "now",
@@ -406,7 +402,7 @@ class ImportMultiTest (NeoxaTestFramework):
         assert_equal(result[0]['success'], False)
         assert_equal(result[0]['error']['code'], -5)
         assert_equal(result[0]['error']['message'], 'Consistency check failed')
-        address_assert = self.nodes[1].validateaddress(address['address'])
+        address_assert = self.nodes[1].getaddressinfo(address['address'])
         assert_equal(address_assert['iswatchonly'], False)
         assert_equal(address_assert['ismine'], False)
         assert_equal('timestamp' in address_assert, False)
@@ -422,7 +418,7 @@ class ImportMultiTest (NeoxaTestFramework):
             "timestamp": "now",
         }])
         assert_equal(result[0]['success'], True)
-        address_assert = self.nodes[1].validateaddress(watchonly_address)
+        address_assert = self.nodes[1].getaddressinfo(watchonly_address)
         assert_equal(address_assert['iswatchonly'], True)
         assert_equal(address_assert['ismine'], False)
         assert_equal(address_assert['timestamp'], timestamp)
@@ -432,7 +428,7 @@ class ImportMultiTest (NeoxaTestFramework):
         # restart nodes to check for proper serialization/deserialization of watch only address
         self.stop_nodes()
         self.start_nodes()
-        address_assert = self.nodes[1].validateaddress(watchonly_address)
+        address_assert = self.nodes[1].getaddressinfo(watchonly_address)
         assert_equal(address_assert['iswatchonly'], True)
         assert_equal(address_assert['ismine'], False)
         assert_equal(address_assert['timestamp'], watchonly_timestamp)

@@ -1,11 +1,9 @@
-// Copyright (c) 2009-2016 The Bitcoin Core developers
-// Copyright (c) 2017-2019 The Raven Core developers
-// Copyright (c) 2020-2021 The Neoxa Core developers
+// Copyright (c) 2009-2015 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef NEOXA_NETADDRESS_H
-#define NEOXA_NETADDRESS_H
+#ifndef BITCOIN_NETADDRESS_H
+#define BITCOIN_NETADDRESS_H
 
 #if defined(HAVE_CONFIG_H)
 #include "config/neoxa-config.h"
@@ -17,6 +15,8 @@
 #include <stdint.h>
 #include <string>
 #include <vector>
+
+extern bool fAllowPrivateNet;
 
 enum Network
 {
@@ -38,7 +38,7 @@ class CNetAddr
 
     public:
         CNetAddr();
-        explicit CNetAddr(const struct in_addr& ipv4Addr);
+        CNetAddr(const struct in_addr& ipv4Addr);
         void Init();
         void SetIP(const CNetAddr& ip);
 
@@ -77,14 +77,14 @@ class CNetAddr
         bool IsValid() const;
         enum Network GetNetwork() const;
         std::string ToString() const;
-        std::string ToStringIP() const;
+        std::string ToStringIP(bool fUseGetnameinfo = true) const;
         unsigned int GetByte(int n) const;
         uint64_t GetHash() const;
         bool GetInAddr(struct in_addr* pipv4Addr) const;
         std::vector<unsigned char> GetGroup() const;
         int GetReachabilityFrom(const CNetAddr *paddrPartner = nullptr) const;
 
-        explicit CNetAddr(const struct in6_addr& pipv6Addr, const uint32_t scope = 0);
+        CNetAddr(const struct in6_addr& pipv6Addr, const uint32_t scope = 0);
         bool GetIn6Addr(struct in6_addr* pipv6Addr) const;
 
         friend bool operator==(const CNetAddr& a, const CNetAddr& b);
@@ -148,8 +148,9 @@ class CService : public CNetAddr
         CService();
         CService(const CNetAddr& ip, unsigned short port);
         CService(const struct in_addr& ipv4Addr, unsigned short port);
-        explicit CService(const struct sockaddr_in& addr);
+        CService(const struct sockaddr_in& addr);
         void Init();
+        void SetPort(unsigned short portIn);
         unsigned short GetPort() const;
         bool GetSockAddr(struct sockaddr* paddr, socklen_t *addrlen) const;
         bool SetSockAddr(const struct sockaddr* paddr);
@@ -157,12 +158,12 @@ class CService : public CNetAddr
         friend bool operator!=(const CService& a, const CService& b);
         friend bool operator<(const CService& a, const CService& b);
         std::vector<unsigned char> GetKey() const;
-        std::string ToString() const;
+        std::string ToString(bool fUseGetnameinfo = true) const;
         std::string ToStringPort() const;
-        std::string ToStringIPPort() const;
+        std::string ToStringIPPort(bool fUseGetnameinfo = true) const;
 
         CService(const struct in6_addr& ipv6Addr, unsigned short port);
-        explicit CService(const struct sockaddr_in6& addr);
+        CService(const struct sockaddr_in6& addr);
 
         ADD_SERIALIZE_METHODS;
 
@@ -176,4 +177,4 @@ class CService : public CNetAddr
         }
 };
 
-#endif // NEOXA_NETADDRESS_H
+#endif // BITCOIN_NETADDRESS_H

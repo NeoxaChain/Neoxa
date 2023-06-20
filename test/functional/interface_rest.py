@@ -1,17 +1,14 @@
 #!/usr/bin/env python3
 # Copyright (c) 2014-2016 The Bitcoin Core developers
-# Copyright (c) 2017-2019 The Raven Core developers
-# Copyright (c) 2020-2021 The Neoxa Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-
 """Test the REST API."""
 
-from struct import unpack, pack
+from test_framework.test_framework import BitcoinTestFramework
+from test_framework.util import *
+from struct import *
 from io import BytesIO
 from codecs import encode
-from test_framework.test_framework import NeoxaTestFramework
-from test_framework.util import connect_nodes_bi, assert_equal, Decimal, json, hex_str_to_bytes, assert_greater_than
 
 import http.client
 import urllib.parse
@@ -43,14 +40,13 @@ def http_post_call(host, port, path, requestdata = '', response_object = 0):
 
     return conn.getresponse().read()
 
-
-# noinspection PyTypeChecker
-class RESTTest (NeoxaTestFramework):
+class RESTTest (BitcoinTestFramework):
     FORMAT_SEPARATOR = "."
 
     def set_test_params(self):
         self.setup_clean_chain = True
         self.num_nodes = 3
+        self.extra_args = [["-rest"]] * self.num_nodes
 
     def setup_network(self, split=False):
         super().setup_network()
@@ -65,7 +61,7 @@ class RESTTest (NeoxaTestFramework):
         self.nodes[2].generate(100)
         self.sync_all()
 
-        assert_equal(self.nodes[0].getbalance(), 5000)
+        assert_equal(self.nodes[0].getbalance(), 500)
 
         txid = self.nodes[0].sendtoaddress(self.nodes[1].getnewaddress(), 0.1)
         self.sync_all()
@@ -89,7 +85,7 @@ class RESTTest (NeoxaTestFramework):
         #######################################
         # GETUTXOS: query an unspent outpoint #
         #######################################
-        json_request = '/checkmempool/'+txid+'-'+str(n)
+        json_request = '/'+txid+'-'+str(n)
         json_string = http_get_call(url.hostname, url.port, '/rest/getutxos'+json_request+self.FORMAT_SEPARATOR+'json')
         json_obj = json.loads(json_string)
 
@@ -104,14 +100,14 @@ class RESTTest (NeoxaTestFramework):
         #################################################
         # GETUTXOS: now query an already spent outpoint #
         #################################################
-        json_request = '/checkmempool/'+vintx+'-0'
+        json_request = '/'+vintx+'-0'
         json_string = http_get_call(url.hostname, url.port, '/rest/getutxos'+json_request+self.FORMAT_SEPARATOR+'json')
         json_obj = json.loads(json_string)
 
         #check chainTip response
         assert_equal(json_obj['chaintipHash'], bb_hash)
 
-        # make sure there is no utxo in the response because this oupoint has been spent
+        #make sure there is no utxo in the response because this oupoint has been spent
         assert_equal(len(json_obj['utxos']), 0)
 
         #check bitmap
@@ -121,7 +117,7 @@ class RESTTest (NeoxaTestFramework):
         ##################################################
         # GETUTXOS: now check both with the same request #
         ##################################################
-        json_request = '/checkmempool/'+txid+'-'+str(n)+'/'+vintx+'-0'
+        json_request = '/'+txid+'-'+str(n)+'/'+vintx+'-0'
         json_string = http_get_call(url.hostname, url.port, '/rest/getutxos'+json_request+self.FORMAT_SEPARATOR+'json')
         json_obj = json.loads(json_string)
         assert_equal(len(json_obj['utxos']), 1)
@@ -155,22 +151,47 @@ class RESTTest (NeoxaTestFramework):
         txid = self.nodes[0].sendtoaddress(self.nodes[1].getnewaddress(), 0.1)
         json_string = http_get_call(url.hostname, url.port, '/rest/tx/'+txid+self.FORMAT_SEPARATOR+"json")
         json_obj = json.loads(json_string)
-        #vintx = json_obj['vin'][0]['txid'] # get the vin to later check for utxo (should be spent by then)
+        # get the spent output to later check for utxo (should be spent by then)
+        spent = '{}-{}'.format(json_obj['vin'][0]['txid'], json_obj['vin'][0]['vout'])
         # get n of 0.1 outpoint
         n = 0
         for vout in json_obj['vout']:
             if vout['value'] == 0.1:
                 n = vout['n']
+        spending = '{}-{}'.format(txid, n)
 
-        json_request = '/'+txid+'-'+str(n)
+        json_request = '/'+spending
         json_string = http_get_call(url.hostname, url.port, '/rest/getutxos'+json_request+self.FORMAT_SEPARATOR+'json')
         json_obj = json.loads(json_string)
-        assert_equal(len(json_obj['utxos']), 0) #there should be an outpoint because it has just added to the mempool
+        assert_equal(len(json_obj['utxos']), 0) #there should be no outpoint because it has just added to the mempool
 
-        json_request = '/checkmempool/'+txid+'-'+str(n)
+        json_request = '/checkmempool/'+spending
         json_string = http_get_call(url.hostname, url.port, '/rest/getutxos'+json_request+self.FORMAT_SEPARATOR+'json')
         json_obj = json.loads(json_string)
         assert_equal(len(json_obj['utxos']), 1) #there should be an outpoint because it has just added to the mempool
+
+        json_request = '/'+spent
+        json_string = http_get_call(url.hostname, url.port, '/rest/getutxos'+json_request+self.FORMAT_SEPARATOR+'json')
+        json_obj = json.loads(json_string)
+        assert_equal(len(json_obj['utxos']), 1) #there should be an outpoint because its spending tx is not confirmed
+
+        json_request = '/checkmempool/'+spent
+        json_string = http_get_call(url.hostname, url.port, '/rest/getutxos'+json_request+self.FORMAT_SEPARATOR+'json')
+        json_obj = json.loads(json_string)
+        assert_equal(len(json_obj['utxos']), 0) #there should be no outpoint because it has just spent (by mempool tx)
+
+        self.nodes[0].generate(1)
+        self.sync_all()
+
+        json_request = '/'+spending
+        json_string = http_get_call(url.hostname, url.port, '/rest/getutxos'+json_request+self.FORMAT_SEPARATOR+'json')
+        json_obj = json.loads(json_string)
+        assert_equal(len(json_obj['utxos']), 1) #there should be an outpoint because it was mined
+
+        json_request = '/checkmempool/'+spending
+        json_string = http_get_call(url.hostname, url.port, '/rest/getutxos'+json_request+self.FORMAT_SEPARATOR+'json')
+        json_obj = json.loads(json_string)
+        assert_equal(len(json_obj['utxos']), 1) #there should be an outpoint because it was mined
 
         #do some invalid requests
         json_request = '{"checkmempool'
@@ -186,14 +207,14 @@ class RESTTest (NeoxaTestFramework):
 
         #test limits
         json_request = '/checkmempool/'
-        for _ in range(0, 20):
+        for x in range(0, 20):
             json_request += txid+'-'+str(n)+'/'
         json_request = json_request.rstrip("/")
         response = http_post_call(url.hostname, url.port, '/rest/getutxos'+json_request+self.FORMAT_SEPARATOR+'json', '', True)
         assert_equal(response.status, 400) #must be a 400 because we exceeding the limits
 
         json_request = '/checkmempool/'
-        for _ in range(0, 15):
+        for x in range(0, 15):
             json_request += txid+'-'+str(n)+'/'
         json_request = json_request.rstrip("/")
         response = http_post_call(url.hostname, url.port, '/rest/getutxos'+json_request+self.FORMAT_SEPARATOR+'json', '', True)
@@ -284,9 +305,10 @@ class RESTTest (NeoxaTestFramework):
 
         # check block tx details
         # let's make 3 tx and mine them on node 1
-        txs = [self.nodes[0].sendtoaddress(self.nodes[2].getnewaddress(), 11),
-               self.nodes[0].sendtoaddress(self.nodes[2].getnewaddress(), 11),
-               self.nodes[0].sendtoaddress(self.nodes[2].getnewaddress(), 11)]
+        txs = []
+        txs.append(self.nodes[0].sendtoaddress(self.nodes[2].getnewaddress(), 11))
+        txs.append(self.nodes[0].sendtoaddress(self.nodes[2].getnewaddress(), 11))
+        txs.append(self.nodes[0].sendtoaddress(self.nodes[2].getnewaddress(), 11))
         self.sync_all()
 
         # check that there are exactly 3 transactions in the TX memory pool before generating the block
@@ -299,8 +321,10 @@ class RESTTest (NeoxaTestFramework):
         # check that there are our submitted transactions in the TX memory pool
         json_string = http_get_call(url.hostname, url.port, '/rest/mempool/contents'+self.FORMAT_SEPARATOR+'json')
         json_obj = json.loads(json_string)
-        for tx in txs:
+        for i, tx in enumerate(txs):
             assert_equal(tx in json_obj, True)
+            assert_equal(json_obj[tx]['spentby'], txs[i+1:i+2])
+            assert_equal(json_obj[tx]['depends'], txs[i-1:i])
 
         # now mine the transactions
         newblockhash = self.nodes[1].generate(1)

@@ -1,7 +1,5 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2016 The Bitcoin Core developers
-// Copyright (c) 2017-2019 The Raven Core developers
-// Copyright (c) 2020-2021 The Neoxa Core developers
+// Copyright (c) 2009-2015 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -10,10 +8,46 @@
 #include "hash.h"
 #include "consensus/consensus.h"
 #include "utilstrencodings.h"
-#include "validation.h"
 
+CMerkleBlock::CMerkleBlock(const CBlock& block, CBloomFilter& filter)
+{
+    header = block.GetBlockHeader();
 
-CMerkleBlock::CMerkleBlock(const CBlock& block, CBloomFilter* filter, const std::set<uint256>* txids)
+    std::vector<bool> vMatch;
+    std::vector<uint256> vHashes;
+
+    vMatch.reserve(block.vtx.size());
+    vHashes.reserve(block.vtx.size());
+
+    const static std::set<int> allowedTxTypes = {
+            TRANSACTION_NORMAL,
+            TRANSACTION_PROVIDER_REGISTER,
+            TRANSACTION_PROVIDER_UPDATE_SERVICE,
+            TRANSACTION_PROVIDER_UPDATE_REGISTRAR,
+            TRANSACTION_PROVIDER_UPDATE_REVOKE,
+            TRANSACTION_COINBASE,
+    };
+
+    for (unsigned int i = 0; i < block.vtx.size(); i++)
+    {
+        const auto& tx = *block.vtx[i];
+        const uint256& hash = tx.GetHash();
+        bool isAllowedType = tx.nVersion != 3 || allowedTxTypes.count(tx.nType) != 0;
+
+        if (isAllowedType && filter.IsRelevantAndUpdate(tx))
+        {
+            vMatch.push_back(true);
+            vMatchedTxn.push_back(std::make_pair(i, hash));
+        }
+        else
+            vMatch.push_back(false);
+        vHashes.push_back(hash);
+    }
+
+    txn = CPartialMerkleTree(vHashes, vMatch);
+}
+
+CMerkleBlock::CMerkleBlock(const CBlock& block, const std::set<uint256>& txids)
 {
     header = block.GetBlockHeader();
 
@@ -26,14 +60,10 @@ CMerkleBlock::CMerkleBlock(const CBlock& block, CBloomFilter* filter, const std:
     for (unsigned int i = 0; i < block.vtx.size(); i++)
     {
         const uint256& hash = block.vtx[i]->GetHash();
-        if (txids && txids->count(hash)) {
+        if (txids.count(hash))
             vMatch.push_back(true);
-        } else if (filter && filter->IsRelevantAndUpdate(*block.vtx[i])) {
-            vMatch.push_back(true);
-            vMatchedTxn.emplace_back(i, hash);
-        } else {
+        else
             vMatch.push_back(false);
-        }
         vHashes.push_back(hash);
     }
 

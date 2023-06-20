@@ -1,7 +1,5 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2016 The Bitcoin Core developers
-// Copyright (c) 2017-2019 The Raven Core developers
-// Copyright (c) 2020-2021 The Neoxa Core developers
+// Copyright (c) 2009-2015 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -14,6 +12,7 @@
 #include "script/standard.h"
 #include "uint256.h"
 
+#include <iostream>
 
 typedef std::vector<unsigned char> valtype;
 
@@ -84,7 +83,7 @@ static bool SignStep(const BaseSignatureCreator& creator, const CScript& scriptP
         return false;
     case TX_RESTRICTED_ASSET_DATA:
         return false;
-    /** NEOXA START */
+    /** NEOX ASSETS START */
     case TX_NEW_ASSET:
         keyID = CKeyID(uint160(vSolutions[0]));
         if (!Sign1(keyID, creator, scriptPubKey, ret, sigversion))
@@ -119,7 +118,7 @@ static bool SignStep(const BaseSignatureCreator& creator, const CScript& scriptP
             ret.push_back(ToByteVector(vch));
         }
         return true;
-    /** NEOXA END */
+    /** NEOX ASSETS END */
     case TX_PUBKEY:
         keyID = CPubKey(vSolutions[0]).GetID();
         return Sign1(keyID, creator, scriptPubKey, ret, sigversion);
@@ -144,7 +143,6 @@ static bool SignStep(const BaseSignatureCreator& creator, const CScript& scriptP
     case TX_MULTISIG:
         ret.push_back(valtype()); // workaround CHECKMULTISIG bug
         return (SignN(vSolutions, creator, scriptPubKey, ret, sigversion));
-
     case TX_WITNESS_V0_KEYHASH:
         ret.push_back(vSolutions[0]);
         return true;
@@ -156,7 +154,6 @@ static bool SignStep(const BaseSignatureCreator& creator, const CScript& scriptP
             return true;
         }
         return false;
-
     default:
         return false;
     }
@@ -165,7 +162,7 @@ static bool SignStep(const BaseSignatureCreator& creator, const CScript& scriptP
 static CScript PushAll(const std::vector<valtype>& values)
 {
     CScript result;
-    for (const valtype& v : values) {
+    for(const valtype& v : values) {
         if (v.size() == 0) {
             result << OP_0;
         } else if (v.size() == 1 && v[0] >= 1 && v[0] <= 16) {
@@ -180,13 +177,13 @@ static CScript PushAll(const std::vector<valtype>& values)
 bool ProduceSignature(const BaseSignatureCreator& creator, const CScript& fromPubKey, SignatureData& sigdata)
 {
     CScript script = fromPubKey;
+    bool solved = true;
     std::vector<valtype> result;
     txnouttype whichType;
-    bool solved = SignStep(creator, script, result, whichType, SIGVERSION_BASE);
+    solved = SignStep(creator, script, result, whichType, SIGVERSION_BASE);
     bool P2SH = false;
     CScript subscript;
     sigdata.scriptWitness.stack.clear();
-
     if (solved && whichType == TX_SCRIPTHASH)
     {
         // Solver returns the subscript that needs to be evaluated;
@@ -353,11 +350,6 @@ static Stacks CombineSignatures(const CScript& scriptPubKey, const BaseSignature
         if (sigs1.script.size() >= sigs2.script.size())
             return sigs1;
         return sigs2;
-    case TX_RESTRICTED_ASSET_DATA:
-        // Don't know anything about this, assume bigger one is correct:
-        if (sigs1.script.size() >= sigs2.script.size())
-            return sigs1;
-        return sigs2;
     case TX_PUBKEY:
     case TX_PUBKEYHASH:
         // Signatures are bigger than placeholders or empty scripts:
@@ -369,6 +361,11 @@ static Stacks CombineSignatures(const CScript& scriptPubKey, const BaseSignature
         if (sigs1.witness.empty() || sigs1.witness[0].empty())
             return sigs2;
         return sigs1;
+    case TX_RESTRICTED_ASSET_DATA:
+        // Don't know anything about this, assume bigger one is correct:
+        if (sigs1.script.size() >= sigs2.script.size())
+            return sigs1;
+        return sigs2;
     case TX_SCRIPTHASH:
         if (sigs1.script.empty() || sigs1.script.back().empty())
             return sigs2;
@@ -430,8 +427,7 @@ static Stacks CombineSignatures(const CScript& scriptPubKey, const BaseSignature
         if (sigs1.script.empty() || sigs1.script[0].empty())
             return sigs2;
         return sigs1;
-
-        default:
+    default:
         return Stacks();
     }
 }

@@ -1,6 +1,5 @@
 // Copyright (c) 2011-2016 The Bitcoin Core developers
-// Copyright (c) 2017-2019 The Raven Core developers
-// Copyright (c) 2020-2021 The Neoxa Core developers
+// Copyright (c) 2017-2021 The Raven Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -8,7 +7,7 @@
 #include "ui_assetcontroldialog.h"
 
 #include "addresstablemodel.h"
-#include "neoxaunits.h"
+#include "bitcoinunits.h"
 #include "guiutil.h"
 #include "optionsmodel.h"
 #include "platformstyle.h"
@@ -20,7 +19,6 @@
 #include "policy/fees.h"
 #include "policy/policy.h"
 #include "validation.h" // For mempool
-#include "wallet/fees.h"
 #include "wallet/wallet.h"
 
 #include <QApplication>
@@ -267,7 +265,7 @@ void AssetControlDialog::showMenu(const QPoint &point)
 // context menu action: copy amount
 void AssetControlDialog::copyAmount()
 {
-    GUIUtil::setClipboard(NeoxaUnits::removeSpaces(contextMenuItem->text(COLUMN_AMOUNT)));
+    GUIUtil::setClipboard(BitcoinUnits::removeSpaces(contextMenuItem->text(COLUMN_AMOUNT)));
 }
 
 // context menu action: copy label
@@ -503,6 +501,7 @@ void AssetControlDialog::updateLabels(WalletModel *model, QDialog* dialog)
         nAssetAmount += nCoinAmount;
 
         // Bytes
+        // Bytes
         CTxDestination address;
         int witnessversion = 0;
         std::vector<unsigned char> witnessprogram;
@@ -545,7 +544,7 @@ void AssetControlDialog::updateLabels(WalletModel *model, QDialog* dialog)
                 nBytes -= 34;
 
         // Fee
-        nPayFee = GetMinimumFee(nBytes, *assetControl, ::mempool, ::feeEstimator, nullptr /* FeeCalculation */);
+        nPayFee = CWallet::GetMinimumFee(nBytes, *assetControl, ::mempool, ::feeEstimator, nullptr /* FeeCalculation */);
 
         if (nPayAmount > 0)
         {
@@ -560,7 +559,7 @@ void AssetControlDialog::updateLabels(WalletModel *model, QDialog* dialog)
     }
 
     // actually update labels
-    int nDisplayUnit = NeoxaUnits::NEOX;
+    int nDisplayUnit = BitcoinUnits::NEOX;
     if (model && model->getOptionsModel())
         nDisplayUnit = model->getOptionsModel()->getDisplayUnit();
 
@@ -580,12 +579,12 @@ void AssetControlDialog::updateLabels(WalletModel *model, QDialog* dialog)
 
     // stats
     l1->setText(QString::number(nQuantity));                                 // Quantity
-    l2->setText(NeoxaUnits::formatWithCustomName(QString::fromStdString(strAssetName), nAssetAmount));        // Amount
-    l3->setText(NeoxaUnits::formatWithUnit(nDisplayUnit, nPayFee));        // Fee
-    l4->setText(NeoxaUnits::formatWithUnit(nDisplayUnit, nAfterFee));      // After Fee
+    l2->setText(BitcoinUnits::formatWithCustomName(QString::fromStdString(strAssetName), nAssetAmount));        // Amount
+    l3->setText(BitcoinUnits::formatWithUnit(nDisplayUnit, nPayFee));        // Fee
+    l4->setText(BitcoinUnits::formatWithUnit(nDisplayUnit, nAfterFee));      // After Fee
     l5->setText(((nBytes > 0) ? ASYMP_UTF8 : "") + QString::number(nBytes));        // Bytes
     l7->setText(fDust ? tr("yes") : tr("no"));                               // Dust
-    l8->setText(NeoxaUnits::formatWithCustomName(QString::fromStdString(strAssetName), nChange));        // Change
+    l8->setText(BitcoinUnits::formatWithCustomName(QString::fromStdString(strAssetName), nChange));        // Change
     if (nPayFee > 0)
     {
         l3->setText(ASYMP_UTF8 + l3->text());
@@ -721,7 +720,7 @@ void AssetControlDialog::updateView()
             }
 
             // amount
-            itemOutput->setText(COLUMN_AMOUNT, NeoxaUnits::format(nDisplayUnit, nAmount));
+            itemOutput->setText(COLUMN_AMOUNT, BitcoinUnits::format(nDisplayUnit, nAmount));
             itemOutput->setData(COLUMN_AMOUNT, Qt::UserRole,
                                 QVariant((qlonglong) nAmount)); // padding so that sorting works correctly
 
@@ -756,7 +755,7 @@ void AssetControlDialog::updateView()
         // amount
         if (treeMode) {
             itemWalletAddress->setText(COLUMN_CHECKBOX, "(" + QString::number(nChildren) + ")");
-            itemWalletAddress->setText(COLUMN_AMOUNT, NeoxaUnits::format(nDisplayUnit, nSum));
+            itemWalletAddress->setText(COLUMN_AMOUNT, BitcoinUnits::format(nDisplayUnit, nSum));
             itemWalletAddress->setData(COLUMN_AMOUNT, Qt::UserRole, QVariant((qlonglong) nSum));
         }
     }

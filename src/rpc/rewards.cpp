@@ -1,4 +1,4 @@
-// Copyright (c) 2019-2020 The OLDNAMENEEDKEEP__Core developers
+// Copyright (c) 2019-2020 The Raven Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -21,16 +21,13 @@
 #include "policy/feerate.h"
 #include "policy/fees.h"
 #include "policy/policy.h"
-#include "policy/rbf.h"
 #include "rpc/mining.h"
-#include "rpc/safemode.h"
 #include "rpc/server.h"
 #include "script/sign.h"
 #include "timedata.h"
 #include "util.h"
 #include "utilmoneystr.h"
 #include "wallet/coincontrol.h"
-#include "wallet/feebumper.h"
 #include "wallet/wallet.h"
 #include "wallet/walletdb.h"
 #include "assets/snapshotrequestdb.h"
@@ -335,8 +332,7 @@ UniValue distributereward(const JSONRPCRequest& request) {
         ret.push_back("Rewards system requires a wallet.");
         return ret;
     }
-
-    ObserveSafeMode();
+ 
     LOCK2(cs_main, walletPtr->cs_wallet);
 
     EnsureWalletIsUnlocked(walletPtr);
@@ -373,7 +369,7 @@ UniValue distributereward(const JSONRPCRequest& request) {
         throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("Invalid snapshot_height: block height should be less than or equal to the current active chain height"));
     }
 
-    if (distribution_asset_name != "NEOX") {
+    if (distribution_asset_name != "NEOX" && distribution_asset_name != "tNEOX") {
         if (!IsAssetNameValid(distribution_asset_name, distributionAssetType))
             throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("Invalid distribution_asset_name: Please use a valid asset name"));
 
@@ -441,8 +437,7 @@ UniValue getdistributestatus(const JSONRPCRequest& request) {
     if (!fAssetIndex) {
         return "_This rpc call is not functional unless -assetindex is enabled. To enable, please run the wallet with -assetindex, this will require a reindex to occur";
     }
-
-    ObserveSafeMode();
+ 
 
     //  Extract parameters
     std::string asset_name(request.params[0].get_str());
@@ -485,12 +480,12 @@ static const CRPCCommand commands[] =
     {           //  category    name                          actor (function)             argNames
                 //  ----------- ------------------------      -----------------------      ----------
 #ifdef ENABLE_WALLET
-            {   "rewards",      "requestsnapshot",            &requestsnapshot,            {"asset_name", "block_height"}},
-            {   "rewards",      "getsnapshotrequest",         &getsnapshotrequest,         {"asset_name", "block_height"}},
-            {   "rewards",      "listsnapshotrequests",         &listsnapshotrequests,         {"asset_name", "block_height"}},
-            {   "rewards",      "cancelsnapshotrequest",      &cancelsnapshotrequest,      {"asset_name", "block_height"}},
-            {   "rewards",      "distributereward",           &distributereward,           {"asset_name", "snapshot_height", "distribution_asset_name", "gross_distribution_amount", "exception_addresses", "change_address"}},
-            {   "rewards",      "getdistributestatus",        &getdistributestatus,            {"asset_name", "block_height", "distribution_asset_name", "gross_distribution_amount", "exception_addresses"}}
+            {   "rewards",      "requestsnapshot",            &requestsnapshot,            true, {"asset_name", "block_height"}},
+            {   "rewards",      "getsnapshotrequest",         &getsnapshotrequest,         true, {"asset_name", "block_height"}},
+            {   "rewards",      "listsnapshotrequests",       &listsnapshotrequests,       true, {"asset_name", "block_height"}},
+            {   "rewards",      "cancelsnapshotrequest",      &cancelsnapshotrequest,      true, {"asset_name", "block_height"}},
+            {   "rewards",      "distributereward",           &distributereward,           true, {"asset_name", "snapshot_height", "distribution_asset_name", "gross_distribution_amount", "exception_addresses", "change_address"}},
+            {   "rewards",      "getdistributestatus",        &getdistributestatus,        true, {"asset_name", "block_height", "distribution_asset_name", "gross_distribution_amount", "exception_addresses"}}
     #endif
     };
 

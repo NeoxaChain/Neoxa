@@ -1,23 +1,20 @@
 // Copyright (c) 2017-2017 The Bitcoin Core developers
-// Copyright (c) 2017-2021 The Raven Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include <assets/assets.h>
-#include <script/standard.h>
-#include <util.h>
-#include <validation.h>
 #include "tx_verify.h"
-#include "chainparams.h"
+#include <validation.h>
 
 #include "consensus.h"
+#include "chainparams.h"
 #include "primitives/transaction.h"
 #include "script/interpreter.h"
 #include "validation.h"
-#include <cmath>
+#include <evo/specialtx.h>
+#include <evo/providertx.h>
 #include <wallet/wallet.h>
-#include <base58.h>
-#include <tinyformat.h>
+#include <assets/assets.h>
+#include <assets/messages.h>
 
 // TODO remove the following dependencies
 #include "chain.h"
@@ -53,7 +50,7 @@ std::pair<int, int64_t> CalculateSequenceLocks(const CTransaction &tx, int flags
     // we would be doing a signed comparison and half the range of nVersion
     // wouldn't support BIP 68.
     bool fEnforceBIP68 = static_cast<uint32_t>(tx.nVersion) >= 2
-                      && flags & LOCKTIME_VERIFY_SEQUENCE;
+                         && flags & LOCKTIME_VERIFY_SEQUENCE;
 
     // Do not enforce sequence numbers as a relative lock time
     // unless we have been instructed to
@@ -166,16 +163,23 @@ int64_t GetTransactionSigOpCost(const CTransaction& tx, const CCoinsViewCache& i
     return nSigOps;
 }
 
-bool CheckTransaction(const CTransaction& tx, CValidationState &state, bool fCheckDuplicateInputs, bool fMempoolCheck, bool fBlockCheck)
+bool CheckTransaction(const CTransaction& tx, CValidationState &state, int nHeight, CAmount blockReward, bool fMempoolCheck, bool fBlockCheck)
 {
+    bool allowEmptyTxInOut = false;
+    if (tx.nType == TRANSACTION_QUORUM_COMMITMENT) {
+        allowEmptyTxInOut = true;
+    }
+
     // Basic checks that don't depend on any context
-    if (tx.vin.empty())
+    if (!allowEmptyTxInOut && tx.vin.empty())
         return state.DoS(10, false, REJECT_INVALID, "bad-txns-vin-empty");
-    if (tx.vout.empty())
+    if (!allowEmptyTxInOut && tx.vout.empty())
         return state.DoS(10, false, REJECT_INVALID, "bad-txns-vout-empty");
     // Size limits (this doesn't take the witness into account, as that hasn't been checked for malleability)
     if (::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION | SERIALIZE_TRANSACTION_NO_WITNESS) * WITNESS_SCALE_FACTOR > GetMaxBlockWeight())
         return state.DoS(100, false, REJECT_INVALID, "bad-txns-oversize");
+    if (tx.vExtraPayload.size() > MAX_TX_EXTRA_PAYLOAD)
+        return state.DoS(100, false, REJECT_INVALID, "bad-txns-payload-oversize");
 
     // Check for negative or overflow output values
     CAmount nValueOut = 0;
@@ -196,7 +200,7 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state, bool fChe
         if (!MoneyRange(nValueOut))
             return state.DoS(100, false, REJECT_INVALID, "bad-txns-txouttotal-toolarge");
 
-        /** NEOXA START */
+        /** NEOX START */
         // Find and handle all new OP_NEOX_ASSET null data transactions
         if (txout.scriptPubKey.IsNullAsset()) {
             CNullAssetTxData data;
@@ -226,7 +230,6 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state, bool fChe
                         nCountAddTagOuts++;
                     }
                 }
-
             } else if (txout.scriptPubKey.IsNullGlobalRestrictionAssetTxDataScript()) {
                 if (!GlobalAssetNullDataFromScript(txout.scriptPubKey, data))
                     return state.DoS(100, false, REJECT_INVALID, "bad-txns-null-global-asset-data-serialization");
@@ -251,9 +254,9 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state, bool fChe
                 fContainsNullAssetVerifierTx = true;
             }
         }
-        /** NEOXA END */
+        /** NEOX END */
 
-        /** NEOXA START */
+        /** NEOX START */
         bool isAsset = false;
         int nType;
         bool fIsOwner;
@@ -310,17 +313,12 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state, bool fChe
                     return state.DoS(100, false, REJECT_INVALID, "bad-txns-asset-issued-amount-isn't-zero");
             } else if (nType == TX_REISSUE_ASSET) {
                 // Specific check and error message to go with to make sure the amount is 0
-                if (AreEnforcedValuesDeployed()) {
-                    // We only want to not accept these txes when checking them from CheckBlock.
-                    // We don't want to change the behavior when reading transactions from the database
-                    // when AreEnforcedValuesDeployed return true
-                    if (fBlockCheck) {
-                        if (txout.nValue != 0) {
-                            return state.DoS(0, false, REJECT_INVALID, "bad-txns-asset-reissued-amount-isn't-zero");
-                        }
+               if (fBlockCheck) {
+                    if (txout.nValue != 0) {
+                        return state.DoS(0, false, REJECT_INVALID, "bad-txns-asset-reissued-amount-isn't-zero");
                     }
                 }
-
+                
                 if (fMempoolCheck) {
                     // Don't accept to the mempool no matter what on these types of transactions
                     if (txout.nValue != 0) {
@@ -363,22 +361,26 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state, bool fChe
         }
     }
 
-    /** NEOXA END */
+    /** NEOX END */
 
-    if (fCheckDuplicateInputs) {
-        std::set<COutPoint> vInOutPoints;
-        for (const auto& txin : tx.vin)
-        {
-            if (!vInOutPoints.insert(txin.prevout).second)
-                return state.DoS(100, false, REJECT_INVALID, "bad-txns-inputs-duplicate");
-        }
+    // Check for duplicate inputs
+    std::set<COutPoint> vInOutPoints;
+    for (const auto& txin : tx.vin)
+    {
+        if (!vInOutPoints.insert(txin.prevout).second)
+            return state.DoS(100, false, REJECT_INVALID, "bad-txns-inputs-duplicate");
     }
 
     if (tx.IsCoinBase())
     {
-        if (tx.vin[0].scriptSig.size() < 2 || tx.vin[0].scriptSig.size() > 100)
+        size_t minCbSize = 2;
+        if (tx.nType == TRANSACTION_COINBASE) {
+            // With the introduction of CbTx, coinbase scripts are not required anymore to hold a valid block height
+            minCbSize = 1;
+        }
+        if (tx.vin[0].scriptSig.size() < minCbSize || tx.vin[0].scriptSig.size() > 100)
             return state.DoS(100, false, REJECT_INVALID, "bad-cb-length");
-
+        
         if (AreCoinbaseCheckAssetsDeployed()) {
             for (auto vout : tx.vout) {
                 if (vout.scriptPubKey.IsAssetScript() || vout.scriptPubKey.IsNullAsset()) {
@@ -386,6 +388,21 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state, bool fChe
                                      REJECT_INVALID, "bad-txns-coinbase-contains-asset-txes");
                 }
             }
+        }
+        
+		FounderPayment founderPayment = Params().GetConsensus().nFounderPayment;
+		CAmount founderReward = founderPayment.getFounderPaymentAmount(nHeight, blockReward);
+		int founderStartHeight = founderPayment.getStartBlock();
+		//std::cout << "height= " << nHeight << ", reward= " << founderReward << endl;
+		if(nHeight > founderStartHeight && founderReward && !founderPayment.IsBlockPayeeValid(tx,nHeight,blockReward)) {
+			return state.DoS(100, false, REJECT_INVALID, "bad-cb-founder-payment-not-found");
+		}
+        if(nHeight > founderStartHeight){
+            if(!isDIPDIP0003Active(nHeight) && founderReward && tx.vout[1].nValue != founderReward){
+                return state.DoS(100,
+                         error("ConnectBlock(): coinbase Community Autonomous Amount Is Invalid. Actual: %ld Should be:%ld ",tx.vout[1].nValue, founderReward),
+                         REJECT_INVALID, "bad-cb-community-autonomous-amount");
+            }                      
         }
     }
     else
@@ -395,7 +412,7 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state, bool fChe
                 return state.DoS(10, false, REJECT_INVALID, "bad-txns-prevout-null");
     }
 
-    /** NEOXA START */
+    /** NEOX START */
     if (tx.IsNewAsset()) {
         /** Verify the reissue assets data */
         std::string strError = "";
@@ -537,7 +554,7 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state, bool fChe
                 if (out.scriptPubKey.Find(OP_NEOX_ASSET)) {
                     if (out.scriptPubKey[0] != OP_NEOX_ASSET) {
                         return state.DoS(100, false, REJECT_INVALID,
-                                         "bad-txns-op-neox-asset-not-in-right-script-location");
+                                         "bad-txns-op-NEOX-asset-not-in-right-script-location");
                     }
                 }
             }
@@ -554,17 +571,17 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state, bool fChe
     }
 
     // we allow restricted asset reissuance without having a verifier string transaction, we don't force it to be update
-    /** NEOXA END */
+    /** NEOX END */
 
     return true;
 }
 
-bool Consensus::CheckTxInputs(const CTransaction& tx, CValidationState& state, const CCoinsViewCache& inputs, int nSpendHeight, CAmount& txfee)
+bool Consensus::CheckTxInputs(const CTransaction& tx, CValidationState& state, const CCoinsViewCache& inputs, int nSpendHeight, CAmount& txfee, CAmount& specialTxFee, bool fFeeVerify)
 {
     // are the actual inputs available?
     if (!inputs.HaveInputs(tx)) {
         return state.DoS(100, false, REJECT_INVALID, "bad-txns-inputs-missingorspent", false,
-                         strprintf("%s: inputs missing/spent", __func__), tx.GetHash());
+                         strprintf("%s: inputs missing/spent", __func__));
     }
 
     CAmount nValueIn = 0;
@@ -583,33 +600,40 @@ bool Consensus::CheckTxInputs(const CTransaction& tx, CValidationState& state, c
         // Check for negative or overflow input values
         nValueIn += coin.out.nValue;
         if (!MoneyRange(coin.out.nValue) || !MoneyRange(nValueIn)) {
-            return state.DoS(100, false, REJECT_INVALID, "bad-txns-inputvalues-outofrange", false, "", tx.GetHash());
+            return state.DoS(100, false, REJECT_INVALID, "bad-txns-inputvalues-outofrange");
         }
     }
 
-    const CAmount value_out = tx.GetValueOut(AreEnforcedValuesDeployed());
+    const CAmount value_out = tx.GetValueOut();
     if (nValueIn < value_out) {
         return state.DoS(100, false, REJECT_INVALID, "bad-txns-in-belowout", false,
-            strprintf("value in (%s) < value out (%s)", FormatMoney(nValueIn), FormatMoney(value_out)), tx.GetHash());
+            strprintf("value in (%s) < value out (%s)", FormatMoney(nValueIn), FormatMoney(value_out)));
     }
 
     // Tally transaction fees
     const CAmount txfee_aux = nValueIn - value_out;
     if (!MoneyRange(txfee_aux)) {
-        return state.DoS(100, false, REJECT_INVALID, "bad-txns-fee-out-of-range", false, "", tx.GetHash());
+        return state.DoS(100, false, REJECT_INVALID, "bad-txns-fee-outofrange");
     }
 
     txfee = txfee_aux;
+
+    if(txfee < 0) {
+		return state.DoS(100, false, REJECT_INVALID, "bad-txns-fee-too-low", false,
+		            strprintf("fee (%s), special tx fee (%s)", FormatMoney(txfee), FormatMoney(specialTxFee)));
+	}
     return true;
 }
+ /* NEOX ASSETS START */ 
 
+    //! Check to make sure that the inputs and outputs CAmount match exactly.
 //! Check to make sure that the inputs and outputs CAmount match exactly.
 bool Consensus::CheckTxAssets(const CTransaction& tx, CValidationState& state, const CCoinsViewCache& inputs, CAssetsCache* assetCache, bool fCheckMempool, std::vector<std::pair<std::string, uint256> >& vPairReissueAssets, const bool fRunningUnitTests, std::set<CMessage>* setMessages, int64_t nBlocktime,   std::vector<std::pair<std::string, CNullAssetTxData>>* myNullAssetData)
 {
     // are the actual inputs available?
     if (!inputs.HaveInputs(tx)) {
         return state.DoS(100, false, REJECT_INVALID, "bad-txns-inputs-missing-or-spent", false,
-                         strprintf("%s: inputs missing/spent", __func__), tx.GetHash());
+                         strprintf("%s: inputs missing/spent", __func__));
     }
 
     // Create map that stores the amount of an asset transaction input. Used to verify no assets are burned
@@ -625,7 +649,7 @@ bool Consensus::CheckTxAssets(const CTransaction& tx, CValidationState& state, c
         if (coin.IsAsset()) {
             CAssetOutputEntry data;
             if (!GetAssetData(coin.out.scriptPubKey, data))
-                return state.DoS(100, false, REJECT_INVALID, "bad-txns-failed-to-get-asset-from-script", false, "", tx.GetHash());
+                return state.DoS(100, false, REJECT_INVALID, "bad-txns-failed-to-get-asset-from-script");
 
             // Add to the total value of assets in the inputs
             if (totalInputs.count(data.assetName))
@@ -639,7 +663,7 @@ bool Consensus::CheckTxAssets(const CTransaction& tx, CValidationState& state, c
 
             if (IsAssetNameAnRestricted(data.assetName)) {
                 if (assetCache->CheckForAddressRestriction(data.assetName, EncodeDestination(data.destination), true)) {
-                    return state.DoS(100, false, REJECT_INVALID, "bad-txns-restricted-asset-transfer-from-frozen-address", false, "", tx.GetHash());
+                    return state.DoS(100, false, REJECT_INVALID, "bad-txns-restricted-asset-transfer-from-frozen-address");
                 }
             }
         }
@@ -665,20 +689,19 @@ bool Consensus::CheckTxAssets(const CTransaction& tx, CValidationState& state, c
 
             if (txout.scriptPubKey.IsNullAsset()) {
                 if (!AreRestrictedAssetsDeployed())
-                    return state.DoS(100, false, REJECT_INVALID,
-                                     "bad-tx-null-asset-data-before-restricted-assets-activated");
+                    return state.DoS(100, false, REJECT_INVALID, "bad-tx-null-asset-data-before-restricted-assets-activated");
 
                 if (txout.scriptPubKey.IsNullAssetTxDataScript()) {
                     if (!ContextualCheckNullAssetTxOut(txout, assetCache, strError, myNullAssetData))
-                        return state.DoS(100, false, REJECT_INVALID, strError, false, "", tx.GetHash());
+                        return state.DoS(100, false, REJECT_INVALID, strError );
                 } else if (txout.scriptPubKey.IsNullGlobalRestrictionAssetTxDataScript()) {
                     if (!ContextualCheckGlobalAssetTxOut(txout, assetCache, strError))
-                        return state.DoS(100, false, REJECT_INVALID, strError, false, "", tx.GetHash());
+                        return state.DoS(100, false, REJECT_INVALID, strError );
                 } else if (txout.scriptPubKey.IsNullAssetVerifierTxDataScript()) {
                     if (!ContextualCheckVerifierAssetTxOut(txout, assetCache, strError))
-                        return state.DoS(100, false, REJECT_INVALID, strError, false, "", tx.GetHash());
+                        return state.DoS(100, false, REJECT_INVALID, strError );
                 } else {
-                    return state.DoS(100, false, REJECT_INVALID, "bad-tx-null-asset-data-unknown-type", false, "", tx.GetHash());
+                    return state.DoS(100, false, REJECT_INVALID, "bad-tx-null-asset-data-unknown-type");
                 }
             }
         }
@@ -687,10 +710,10 @@ bool Consensus::CheckTxAssets(const CTransaction& tx, CValidationState& state, c
             CAssetTransfer transfer;
             std::string address = "";
             if (!TransferAssetFromScript(txout.scriptPubKey, transfer, address))
-                return state.DoS(100, false, REJECT_INVALID, "bad-tx-asset-transfer-bad-deserialize", false, "", tx.GetHash());
+                return state.DoS(100, false, REJECT_INVALID, "bad-tx-asset-transfer-bad-deserialize");
 
             if (!ContextualCheckTransferAsset(assetCache, transfer, address, strError))
-                return state.DoS(100, false, REJECT_INVALID, strError, false, "", tx.GetHash());
+                return state.DoS(100, false, REJECT_INVALID, strError );
 
             // Add to the total value of assets in the outputs
             if (totalOutputs.count(transfer.strName))
@@ -701,18 +724,18 @@ bool Consensus::CheckTxAssets(const CTransaction& tx, CValidationState& state, c
             if (!fRunningUnitTests) {
                 if (IsAssetNameAnOwner(transfer.strName)) {
                     if (transfer.nAmount != OWNER_ASSET_AMOUNT)
-                        return state.DoS(100, false, REJECT_INVALID, "bad-txns-transfer-owner-amount-was-not-1", false, "", tx.GetHash());
+                        return state.DoS(100, false, REJECT_INVALID, "bad-txns-transfer-owner-amount-was-not-1" );
                 } else {
                     // For all other types of assets, make sure they are sending the right type of units
                     CNewAsset asset;
                     if (!assetCache->GetAssetMetaDataIfExists(transfer.strName, asset))
-                        return state.DoS(100, false, REJECT_INVALID, "bad-txns-transfer-asset-not-exist", false, "", tx.GetHash());
+                        return state.DoS(100, false, REJECT_INVALID, "bad-txns-transfer-asset-not-exist" );
 
                     if (asset.strName != transfer.strName)
-                        return state.DoS(100, false, REJECT_INVALID, "bad-txns-asset-database-corrupted", false, "", tx.GetHash());
+                        return state.DoS(100, false, REJECT_INVALID, "bad-txns-asset-database-corrupted" );
 
                     if (!CheckAmountWithUnits(transfer.nAmount, asset.units))
-                        return state.DoS(100, false, REJECT_INVALID, "bad-txns-transfer-asset-amount-not-match-units", false, "", tx.GetHash());
+                        return state.DoS(100, false, REJECT_INVALID, "bad-txns-transfer-asset-amount-not-match-units" );
                 }
             }
 
@@ -739,11 +762,11 @@ bool Consensus::CheckTxAssets(const CTransaction& tx, CValidationState& state, c
             CReissueAsset reissue;
             std::string address;
             if (!ReissueAssetFromScript(txout.scriptPubKey, reissue, address))
-                return state.DoS(100, false, REJECT_INVALID, "bad-tx-asset-reissue-bad-deserialize", false, "", tx.GetHash());
+                return state.DoS(100, false, REJECT_INVALID, "bad-tx-asset-reissue-bad-deserialize" );
 
             if (mapReissuedAssets.count(reissue.strName)) {
                 if (mapReissuedAssets.at(reissue.strName) != tx.GetHash())
-                    return state.DoS(100, false, REJECT_INVALID, "bad-tx-reissue-chaining-not-allowed", false, "", tx.GetHash());
+                    return state.DoS(100, false, REJECT_INVALID, "bad-tx-reissue-chaining-not-allowed" );
             } else {
                 vPairReissueAssets.emplace_back(std::make_pair(reissue.strName, tx.GetHash()));
             }
@@ -758,7 +781,7 @@ bool Consensus::CheckTxAssets(const CTransaction& tx, CValidationState& state, c
             std::string address;
             if (!AssetFromScript(tx.vout[tx.vout.size() - 1].scriptPubKey, asset, address)) {
                 error("%s : Failed to get new asset from transaction: %s", __func__, tx.GetHash().GetHex());
-                return state.DoS(100, false, REJECT_INVALID, "bad-txns-issue-serialzation-failed", false, "", tx.GetHash());
+                return state.DoS(100, false, REJECT_INVALID, "bad-txns-issue-serialzation-failed" );
             }
 
             AssetType assetType;
@@ -772,58 +795,58 @@ bool Consensus::CheckTxAssets(const CTransaction& tx, CValidationState& state, c
             std::string address;
             if (!ReissueAssetFromScript(tx.vout[tx.vout.size() - 1].scriptPubKey, reissue_asset, address)) {
                 error("%s : Failed to get new asset from transaction: %s", __func__, tx.GetHash().GetHex());
-                return state.DoS(100, false, REJECT_INVALID, "bad-txns-reissue-serialzation-failed", false, "", tx.GetHash());
+                return state.DoS(100, false, REJECT_INVALID, "bad-txns-reissue-serialzation-failed" );
             }
             if (!ContextualCheckReissueAsset(assetCache, reissue_asset, strError, tx))
-                return state.DoS(100, false, REJECT_INVALID, "bad-txns-reissue-contextual-" + strError, false, "", tx.GetHash());
+                return state.DoS(100, false, REJECT_INVALID, "bad-txns-reissue-contextual-" + strError );
         } else if (tx.IsNewUniqueAsset()) {
             if (!ContextualCheckUniqueAssetTx(assetCache, strError, tx))
-                return state.DoS(100, false, REJECT_INVALID, "bad-txns-issue-unique-contextual-" + strError, false, "", tx.GetHash());
+                return state.DoS(100, false, REJECT_INVALID, "bad-txns-issue-unique-contextual-" + strError );
         } else if (tx.IsNewMsgChannelAsset()) {
             if (!AreMessagesDeployed())
-                return state.DoS(100, false, REJECT_INVALID, "bad-txns-issue-msgchannel-before-messaging-is-active", false, "", tx.GetHash());
+                return state.DoS(100, false, REJECT_INVALID, "bad-txns-issue-msgchannel-before-messaging-is-active");
 
             CNewAsset asset;
             std::string strAddress;
             if (!MsgChannelAssetFromTransaction(tx, asset, strAddress))
-                return state.DoS(100, false, REJECT_INVALID, "bad-txns-issue-msgchannel-serialzation-failed", false, "", tx.GetHash());
+                return state.DoS(100, false, REJECT_INVALID, "bad-txns-issue-msgchannel-serialzation-failed" );
 
             if (!ContextualCheckNewAsset(assetCache, asset, strError, fCheckMempool))
                 return state.DoS(100, error("%s: %s", __func__, strError), REJECT_INVALID,
                                  "bad-txns-issue-msgchannel-contextual-" + strError);
         } else if (tx.IsNewQualifierAsset()) {
             if (!AreRestrictedAssetsDeployed())
-                return state.DoS(100, false, REJECT_INVALID, "bad-txns-issue-qualifier-before-it-is-active", false, "", tx.GetHash());
+                return state.DoS(100, false, REJECT_INVALID, "bad-txns-issue-qualifier-before-it-is-active");
 
             CNewAsset asset;
             std::string strAddress;
             if (!QualifierAssetFromTransaction(tx, asset, strAddress))
-                return state.DoS(100, false, REJECT_INVALID, "bad-txns-issue-qualifier-serialzation-failed", false, "", tx.GetHash());
+                return state.DoS(100, false, REJECT_INVALID, "bad-txns-issue-qualifier-serialzation-failed" );
 
             if (!ContextualCheckNewAsset(assetCache, asset, strError, fCheckMempool))
-                return state.DoS(100, false, REJECT_INVALID, "bad-txns-issue-qualfier-contextual" + strError, false, "", tx.GetHash());
+                return state.DoS(100, false, REJECT_INVALID, "bad-txns-issue-qualfier-contextual" + strError );
 
         } else if (tx.IsNewRestrictedAsset()) {
             if (!AreRestrictedAssetsDeployed())
-                return state.DoS(100, false, REJECT_INVALID, "bad-txns-issue-restricted-before-it-is-active", false, "", tx.GetHash());
+                return state.DoS(100, false, REJECT_INVALID, "bad-txns-issue-restricted-before-it-is-active");
 
             // Get asset data
             CNewAsset asset;
             std::string strAddress;
             if (!RestrictedAssetFromTransaction(tx, asset, strAddress))
-                return state.DoS(100, false, REJECT_INVALID, "bad-txns-issue-restricted-serialzation-failed", false, "", tx.GetHash());
+                return state.DoS(100, false, REJECT_INVALID, "bad-txns-issue-restricted-serialzation-failed" );
 
             if (!ContextualCheckNewAsset(assetCache, asset, strError, fCheckMempool))
-                return state.DoS(100, false, REJECT_INVALID, "bad-txns-issue-restricted-contextual" + strError, false, "", tx.GetHash());
+                return state.DoS(100, false, REJECT_INVALID, "bad-txns-issue-restricted-contextual" + strError );
 
             // Get verifier string
             CNullAssetTxVerifierString verifier;
             if (!tx.GetVerifierStringFromTx(verifier, strError))
-                return state.DoS(100, false, REJECT_INVALID, "bad-txns-issue-restricted-verifier-search-" + strError, false, "", tx.GetHash());
+                return state.DoS(100, false, REJECT_INVALID, "bad-txns-issue-restricted-verifier-search-" + strError );
 
             // Check the verifier string against the destination address
             if (!ContextualCheckVerifierString(assetCache, verifier.verifier_string, strAddress, strError))
-                return state.DoS(100, false, REJECT_INVALID, strError, false, "", tx.GetHash());
+                return state.DoS(100, false, REJECT_INVALID, strError );
 
         } else {
             for (auto out : tx.vout) {
@@ -831,17 +854,17 @@ bool Consensus::CheckTxAssets(const CTransaction& tx, CValidationState& state, c
                 bool _isOwner;
                 if (out.scriptPubKey.IsAssetScript(nType, _isOwner)) {
                     if (nType != TX_TRANSFER_ASSET) {
-                        return state.DoS(100, false, REJECT_INVALID, "bad-txns-bad-asset-transaction", false, "", tx.GetHash());
+                        return state.DoS(100, false, REJECT_INVALID, "bad-txns-bad-asset-transaction" );
                     }
                 } else {
                     if (out.scriptPubKey.Find(OP_NEOX_ASSET)) {
                         if (AreRestrictedAssetsDeployed()) {
                             if (out.scriptPubKey[0] != OP_NEOX_ASSET) {
                                 return state.DoS(100, false, REJECT_INVALID,
-                                                 "bad-txns-op-neox-asset-not-in-right-script-location", false, "", tx.GetHash());
+                                                 "bad-txns-op-neox-asset-not-in-right-script-location");
                             }
                         } else {
-                            return state.DoS(100, false, REJECT_INVALID, "bad-txns-bad-asset-script", false, "", tx.GetHash());
+                            return state.DoS(100, false, REJECT_INVALID, "bad-txns-bad-asset-script");
                         }
                     }
                 }
@@ -853,19 +876,21 @@ bool Consensus::CheckTxAssets(const CTransaction& tx, CValidationState& state, c
         if (!totalInputs.count(outValue.first)) {
             std::string errorMsg;
             errorMsg = strprintf("Bad Transaction - Trying to create outpoint for asset that you don't have: %s", outValue.first);
-            return state.DoS(100, false, REJECT_INVALID, "bad-tx-inputs-outputs-mismatch " + errorMsg, false, "", tx.GetHash());
+            return state.DoS(100, false, REJECT_INVALID, "bad-tx-inputs-outputs-mismatch " + errorMsg );
         }
 
         if (totalInputs.at(outValue.first) != outValue.second) {
             std::string errorMsg;
             errorMsg = strprintf("Bad Transaction - Assets would be burnt %s", outValue.first);
-            return state.DoS(100, false, REJECT_INVALID, "bad-tx-inputs-outputs-mismatch " + errorMsg, false, "", tx.GetHash());
+            return state.DoS(100, false, REJECT_INVALID, "bad-tx-inputs-outputs-mismatch " + errorMsg );
         }
     }
 
     // Check the input size and the output size
     if (totalOutputs.size() != totalInputs.size()) {
-        return state.DoS(100, false, REJECT_INVALID, "bad-tx-asset-inputs-size-does-not-match-outputs-size", false, "", tx.GetHash());
+        return state.DoS(100, false, REJECT_INVALID, "bad-tx-asset-inputs-size-does-not-match-outputs-size" );
     }
     return true;
 }
+
+    /* NEOX ASSETS END */

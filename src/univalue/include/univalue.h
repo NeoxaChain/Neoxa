@@ -1,5 +1,5 @@
 // Copyright 2014 BitPay Inc.
-// Copyright 2015 OLDNAMENEEDKEEP__Core Developers
+// Copyright 2015 Bitcoin Core Developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -7,7 +7,6 @@
 #define __UNIVALUE_H__
 
 #include <stdint.h>
-#include <string.h>
 
 #include <string>
 #include <vector>
@@ -70,11 +69,10 @@ public:
     size_t size() const { return values.size(); }
 
     bool getBool() const { return isTrue(); }
-    void getObjMap(std::map<std::string,UniValue>& kv) const;
-    bool checkObject(const std::map<std::string,UniValue::VType>& memberTypes) const;
+    bool checkObject(const std::map<std::string,UniValue::VType>& memberTypes);
     const UniValue& operator[](const std::string& key) const;
-    const UniValue& operator[](size_t index) const;
-    bool exists(const std::string& key) const { size_t i; return findKey(key, i); }
+    const UniValue& operator[](unsigned int index) const;
+    bool exists(const std::string& key) const { return (findKey(key) >= 0); }
 
     bool isNull() const { return (typ == VNULL); }
     bool isTrue() const { return (typ == VBOOL) && (val == "1"); }
@@ -94,25 +92,8 @@ public:
         std::string s(val_);
         return push_back(s);
     }
-    bool push_back(uint64_t val_) {
-        UniValue tmpVal(val_);
-        return push_back(tmpVal);
-    }
-    bool push_back(int64_t val_) {
-        UniValue tmpVal(val_);
-        return push_back(tmpVal);
-    }
-    bool push_back(int val_) {
-        UniValue tmpVal(val_);
-        return push_back(tmpVal);
-    }
-    bool push_back(double val_) {
-        UniValue tmpVal(val_);
-        return push_back(tmpVal);
-    }
     bool push_backV(const std::vector<UniValue>& vec);
 
-    void __pushKV(const std::string& key, const UniValue& val);
     bool pushKV(const std::string& key, const UniValue& val);
     bool pushKV(const std::string& key, const std::string& val_) {
         UniValue tmpVal(VSTR, val_);
@@ -143,10 +124,9 @@ public:
     std::string write(unsigned int prettyIndent = 0,
                       unsigned int indentLevel = 0) const;
 
-    bool read(const char *raw, size_t len);
-    bool read(const char *raw) { return read(raw, strlen(raw)); }
+    bool read(const char *raw);
     bool read(const std::string& rawStr) {
-        return read(rawStr.data(), rawStr.size());
+        return read(rawStr.c_str());
     }
 
 private:
@@ -155,7 +135,7 @@ private:
     std::vector<std::string> keys;
     std::vector<UniValue> values;
 
-    bool findKey(const std::string& key, size_t& retIdx) const;
+    int findKey(const std::string& key) const;
     void writeArray(unsigned int prettyIndent, unsigned int indentLevel, std::string& s) const;
     void writeObject(unsigned int prettyIndent, unsigned int indentLevel, std::string& s) const;
 
@@ -167,9 +147,7 @@ public:
     bool get_bool() const;
     const std::string& get_str() const;
     int get_int() const;
-    uint32_t get_uint() const;
     int64_t get_int64() const;
-    uint64_t get_uint64() const;
     double get_real() const;
     const UniValue& get_obj() const;
     const UniValue& get_array() const;
@@ -262,7 +240,7 @@ enum jtokentype {
 };
 
 extern enum jtokentype getJsonToken(std::string& tokenVal,
-                                    unsigned int& consumed, const char *raw, const char *end);
+                                    unsigned int& consumed, const char *raw);
 extern const char *uvTypeName(UniValue::VType t);
 
 static inline bool jsonTokenIsValue(enum jtokentype jtt)

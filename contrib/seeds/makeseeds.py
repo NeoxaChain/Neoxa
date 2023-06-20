@@ -1,50 +1,39 @@
 #!/usr/bin/env python3
-# Copyright (c) 2013-2017 The Bitcoin Core developers
-# Copyright (c) 2017-2019 The Raven Core developers
-# Copyright (c) 2020-2021 The Neoxa Core developers
+# Copyright (c) 2013-2016 The Bitcoin Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #
-# Generate seeds.txt from Pieter's DNS seeder
+# Generate seeds.txt from "protx list valid 1"
 #
-
-NSEEDS=512
-
-MAX_SEEDS_PER_ASN=2
-
-MIN_BLOCKS = 337600
-
-# These are hosts that have been observed to be behaving strangely (e.g.
-# aggressively connecting to every node).
-SUSPICIOUS_HOSTS = {
-    "130.211.129.106", "178.63.107.226",
-    "83.81.130.26", "88.198.17.7", "148.251.238.178", "176.9.46.6",
-    "54.173.72.127", "54.174.10.182", "54.183.64.54", "54.194.231.211",
-    "54.66.214.167", "54.66.220.137", "54.67.33.14", "54.77.251.214",
-    "54.94.195.96", "54.94.200.247"
-}
 
 import re
 import sys
 import dns.resolver
 import collections
+import json
+import multiprocessing
+
+NSEEDS=512
+
+MAX_SEEDS_PER_ASN=4
+
+# These are hosts that have been observed to be behaving strangely (e.g.
+# aggressively connecting to every node).
+SUSPICIOUS_HOSTS = {
+}
 
 PATTERN_IPV4 = re.compile(r"^((\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})):(\d+)$")
 PATTERN_IPV6 = re.compile(r"^\[([0-9a-z:]+)\]:(\d+)$")
 PATTERN_ONION = re.compile(r"^([abcdefghijklmnopqrstuvwxyz234567]{16}\.onion):(\d+)$")
-PATTERN_AGENT = re.compile(r"^(/Satoshi:0.13.(1|2|99)/|/Satoshi:0.14.(0|1|2|99)/)$")
 
-def parseline(line):
-    sline = line.split()
-    if len(sline) < 11:
-       return None
-    m = PATTERN_IPV4.match(sline[0])
+def parseip(ip):
+    m = PATTERN_IPV4.match(ip)
     sortkey = None
     ip = None
     if m is None:
-        m = PATTERN_IPV6.match(sline[0])
+        m = PATTERN_IPV6.match(ip)
         if m is None:
-            m = PATTERN_ONION.match(sline[0])
+            m = PATTERN_ONION.match(ip)
             if m is None:
                 return None
             else:
@@ -71,42 +60,39 @@ def parseline(line):
         sortkey = ip
         ipstr = m.group(1)
         port = int(m.group(6))
-    # Skip bad results.
-    if sline[1] == 0:
-        return None
-    # Extract uptime %.
-    uptime30 = float(sline[7][:-1])
-    # Extract Unix timestamp of last success.
-    lastsuccess = int(sline[2])
-    # Extract protocol version.
-    version = int(sline[10])
-    # Extract user agent.
-    agent = sline[11][1:-1]
-    # Extract service flags.
-    service = int(sline[9], 16)
-    # Extract blocks.
-    blocks = int(sline[8])
-    # Construct result.
+
     return {
-        'net': net,
-        'ip': ipstr,
-        'port': port,
-        'ipnum': ip,
-        'uptime': uptime30,
-        'lastsuccess': lastsuccess,
-        'version': version,
-        'agent': agent,
-        'service': service,
-        'blocks': blocks,
-        'sortkey': sortkey,
+        "net": net,
+        "ip": ipstr,
+        "port": port,
+        "ipnum": ip,
+        "sortkey": sortkey
     }
 
-def filtermultiport(ips):
-    '''Filter out hosts with more nodes per IP'''
+def filtermulticollateralhash(mns):
+    '''Filter out MNs sharing the same collateral hash'''
     hist = collections.defaultdict(list)
-    for ip in ips:
-        hist[ip['sortkey']].append(ip)
-    return [value[0] for (key,value) in list(hist.items()) if len(value)==1]
+    for mn in mns:
+        hist[mn['collateralHash']].append(mn)
+    return [mn for mn in mns if len(hist[mn['collateralHash']]) == 1]
+
+def filtermulticollateraladdress(mns):
+    '''Filter out MNs sharing the same collateral address'''
+    hist = collections.defaultdict(list)
+    for mn in mns:
+        hist[mn['collateralAddress']].append(mn)
+    return [mn for mn in mns if len(hist[mn['collateralAddress']]) == 1]
+
+def filtermultipayoutaddress(mns):
+    '''Filter out MNs sharing the same payout address'''
+    hist = collections.defaultdict(list)
+    for mn in mns:
+        hist[mn['state']['payoutAddress']].append(mn)
+    return [mn for mn in mns if len(hist[mn['state']['payoutAddress']]) == 1]
+
+def resolveasn(resolver, ip):
+    asn = int([x.to_text() for x in resolver.resolve('.'.join(reversed(ip.split('.'))) + '.origin.asn.cymru.com', 'TXT').response.answer][0].split('\"')[1].split(' ')[0])
+    return asn
 
 # Based on Greg Maxwell's seed_filter.py
 def filterbyasn(ips, max_per_asn, max_total):
@@ -115,14 +101,25 @@ def filterbyasn(ips, max_per_asn, max_total):
     ips_ipv6 = [ip for ip in ips if ip['net'] == 'ipv6']
     ips_onion = [ip for ip in ips if ip['net'] == 'onion']
 
+    my_resolver = dns.resolver.Resolver()
+
+    pool = multiprocessing.Pool(processes=16)
+
+    # OpenDNS servers
+    my_resolver.nameservers = ['1.1.1.1', '8.8.8.8']
+
+    # Resolve ASNs in parallel
+    asns = [pool.apply_async(resolveasn, args=(my_resolver, ip['ip'])) for ip in ips_ipv4]
+
     # Filter IPv4 by ASN
     result = []
     asn_count = {}
-    for ip in ips_ipv4:
+    for i in range(len(ips_ipv4)):
+        ip = ips_ipv4[i]
         if len(result) == max_total:
             break
         try:
-            asn = int([x.to_text() for x in dns.resolver.query('.'.join(reversed(ip['ip'].split('.'))) + '.origin.asn.cymru.com', 'TXT').response.answer][0].split('\"')[1].split(' ')[0])
+            asn = asns[i].get()
             if asn not in asn_count:
                 asn_count[asn] = 0
             if asn_count[asn] == max_per_asn:
@@ -140,25 +137,23 @@ def filterbyasn(ips, max_per_asn, max_total):
     return result
 
 def main():
-    lines = sys.stdin.readlines()
-    ips = [parseline(line) for line in lines]
+    # This expects a json as outputted by "protx list valid 1"
+    if len(sys.argv) > 1:
+        with open(sys.argv[1], 'r', encoding="utf8") as f:
+            mns = json.load(f)
+    else:
+        mns = json.load(sys.stdin)
 
-    # Skip entries with valid address.
-    ips = [ip for ip in ips if ip is not None]
-    # Skip entries from suspicious hosts.
-    ips = [ip for ip in ips if ip['ip'] not in SUSPICIOUS_HOSTS]
-    # Enforce minimal number of blocks.
-    ips = [ip for ip in ips if ip['blocks'] >= MIN_BLOCKS]
-    # Require service bit 1.
-    ips = [ip for ip in ips if (ip['service'] & 1) == 1]
-    # Require at least 50% 30-day uptime.
-    ips = [ip for ip in ips if ip['uptime'] > 50]
-    # Require a known and recent user agent.
-    ips = [ip for ip in ips if PATTERN_AGENT.match(ip['agent'])]
-    # Sort by availability (and use last success as tie breaker)
-    ips.sort(key=lambda x: (x['uptime'], x['lastsuccess'], x['ip']), reverse=True)
-    # Filter out hosts with multiple neoxa ports, these are likely abusive
-    ips = filtermultiport(ips)
+    # Skip PoSe banned MNs
+    mns = [mn for mn in mns if mn['state']['PoSeBanHeight'] == -1]
+    # Skip MNs with < 10000 confirmations
+    mns = [mn for mn in mns if mn['confirmations'] >= 10000]
+    # Filter out MNs which are definitely from the same person/operator
+    mns = filtermulticollateralhash(mns)
+    mns = filtermulticollateraladdress(mns)
+    mns = filtermultipayoutaddress(mns)
+    # Extract IPs
+    ips = [parseip(mn['state']['service']) for mn in mns]
     # Look up ASNs and limit results, both per ASN and globally.
     ips = filterbyasn(ips, MAX_SEEDS_PER_ASN, NSEEDS)
     # Sort the results by IP address (for deterministic output).

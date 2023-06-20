@@ -1,12 +1,10 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2016 The Bitcoin Core developers
-// Copyright (c) 2017-2019 The Raven Core developers
-// Copyright (c) 2020-2021 The Neoxa Core developers
+// Copyright (c) 2009-2015 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef NEOXA_ADDRDB_H
-#define NEOXA_ADDRDB_H
+#ifndef BITCOIN_ADDRDB_H
+#define BITCOIN_ADDRDB_H
 
 #include "fs.h"
 #include "serialize.h"
@@ -39,7 +37,7 @@ public:
         SetNull();
     }
 
-    explicit CBanEntry(int64_t nCreateTimeIn)
+    CBanEntry(int64_t nCreateTimeIn)
     {
         SetNull();
         nCreateTime = nCreateTimeIn;
@@ -63,7 +61,7 @@ public:
         banReason = BanReasonUnknown;
     }
 
-    std::string banReasonToString() const
+    std::string banReasonToString()
     {
         switch (banReason) {
         case BanReasonNodeMisbehaving:
@@ -101,4 +99,4 @@ public:
     bool Read(banmap_t& banSet);
 };
 
-#endif // NEOXA_ADDRDB_H
+#endif // BITCOIN_ADDRDB_H

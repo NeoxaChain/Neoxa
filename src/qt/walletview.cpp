@@ -1,5 +1,4 @@
-// Copyright (c) 2011-2016 The Bitcoin Core developers
-// Copyright (c) 2017-2021 The Raven Core developers
+// Copyright (c) 2011-2015 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -7,7 +6,7 @@
 
 #include "addressbookpage.h"
 #include "askpassphrasedialog.h"
-#include "neoxagui.h"
+#include "bitcoingui.h"
 #include "clientmodel.h"
 #include "guiutil.h"
 #include "optionsmodel.h"
@@ -16,15 +15,14 @@
 #include "receivecoinsdialog.h"
 #include "sendcoinsdialog.h"
 #include "signverifymessagedialog.h"
+#include "transactionrecord.h"
 #include "transactiontablemodel.h"
-#include "assettablemodel.h"
 #include "transactionview.h"
-#include "walletmodel.h"
 #include "assetsdialog.h"
 #include "createassetdialog.h"
 #include "reissueassetdialog.h"
 #include "restrictedassetsdialog.h"
-#include <validation.h>
+#include "walletmodel.h"
 
 #include "ui_interface.h"
 
@@ -32,10 +30,11 @@
 #include <QActionGroup>
 #include <QFileDialog>
 #include <QHBoxLayout>
+#include <QLabel>
 #include <QProgressDialog>
 #include <QPushButton>
+#include <QSettings>
 #include <QVBoxLayout>
-
 
 WalletView::WalletView(const PlatformStyle *_platformStyle, QWidget *parent):
     QStackedWidget(parent),
@@ -54,19 +53,28 @@ WalletView::WalletView(const PlatformStyle *_platformStyle, QWidget *parent):
     QPushButton *exportButton = new QPushButton(tr("&Export"), this);
     exportButton->setToolTip(tr("Export the data in the current tab to a file"));
     if (platformStyle->getImagesOnButtons()) {
-        exportButton->setIcon(platformStyle->SingleColorIcon(":/icons/export"));
+        exportButton->setIcon(QIcon(":/icons/export"));
     }
     hbox_buttons->addStretch();
+
+    // Sum of selected transactions
+    QLabel *transactionSumLabel = new QLabel(); // Label
+    transactionSumLabel->setObjectName("transactionSumLabel"); // Label ID as CSS-reference
+    transactionSumLabel->setText(tr("Selected amount:"));
+    hbox_buttons->addWidget(transactionSumLabel);
+
+    transactionSum = new QLabel(); // Amount
+    transactionSum->setObjectName("transactionSum"); // Label ID as CSS-reference
+    transactionSum->setMinimumSize(200, 8);
+    transactionSum->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    hbox_buttons->addWidget(transactionSum);
+
     hbox_buttons->addWidget(exportButton);
     vbox->addLayout(hbox_buttons);
     transactionsPage->setLayout(vbox);
+
     receiveCoinsPage = new ReceiveCoinsDialog(platformStyle);
     sendCoinsPage = new SendCoinsDialog(platformStyle);
-
-    assetsPage = new AssetsDialog(platformStyle);
-    createAssetsPage = new CreateAssetDialog(platformStyle);
-    manageAssetsPage = new ReissueAssetDialog(platformStyle);
-    restrictedAssetsPage = new RestrictedAssetsDialog(platformStyle);
 
     usedSendingAddressesPage = new AddressBookPage(platformStyle, AddressBookPage::ForEditing, AddressBookPage::SendingTab, this);
     usedReceivingAddressesPage = new AddressBookPage(platformStyle, AddressBookPage::ForEditing, AddressBookPage::ReceivingTab, this);
@@ -76,12 +84,21 @@ WalletView::WalletView(const PlatformStyle *_platformStyle, QWidget *parent):
     addWidget(receiveCoinsPage);
     addWidget(sendCoinsPage);
 
-    /** NEOXA START */
+    QSettings settings;
+    if (!fLiteMode && settings.value("fShowSmartnodesTab").toBool()) {
+        smartnodeListPage = new SmartnodeList(platformStyle);
+        addWidget(smartnodeListPage);
+    }
+
+    assetsPage = new AssetsDialog(platformStyle);
+    createAssetsPage = new CreateAssetDialog(platformStyle);
+    manageAssetsPage = new ReissueAssetDialog(platformStyle);
+    restrictedAssetsPage = new RestrictedAssetsDialog(platformStyle);
+
     addWidget(assetsPage);
     addWidget(createAssetsPage);
     addWidget(manageAssetsPage);
     addWidget(restrictedAssetsPage);
-    /** NEOXA END */
 
     // Clicking on a transaction on the overview pre-selects the transaction on the transaction history page
     connect(overviewPage, SIGNAL(transactionClicked(QModelIndex)), transactionView, SLOT(focusTransaction(QModelIndex)));
@@ -90,15 +107,18 @@ WalletView::WalletView(const PlatformStyle *_platformStyle, QWidget *parent):
     // Double-clicking on a transaction on the transaction history page shows details
     connect(transactionView, SIGNAL(doubleClicked(QModelIndex)), transactionView, SLOT(showDetails()));
 
+    // Update wallet with sum of selected transactions
+    connect(transactionView, SIGNAL(trxAmount(QString)), this, SLOT(trxAmount(QString)));
+
     // Clicking on "Export" allows to export the transaction list
     connect(exportButton, SIGNAL(clicked()), transactionView, SLOT(exportClicked()));
 
     // Pass through messages from sendCoinsPage
     connect(sendCoinsPage, SIGNAL(message(QString,QString,unsigned int)), this, SIGNAL(message(QString,QString,unsigned int)));
+
     // Pass through messages from transactionView
     connect(transactionView, SIGNAL(message(QString,QString,unsigned int)), this, SIGNAL(message(QString,QString,unsigned int)));
 
-    /** NEOXA START */
     connect(assetsPage, SIGNAL(message(QString,QString,unsigned int)), this, SIGNAL(message(QString,QString,unsigned int)));
     connect(createAssetsPage, SIGNAL(message(QString,QString,unsigned int)), this, SIGNAL(message(QString,QString,unsigned int)));
     connect(manageAssetsPage, SIGNAL(message(QString,QString,unsigned int)), this, SIGNAL(message(QString,QString,unsigned int)));
@@ -107,14 +127,14 @@ WalletView::WalletView(const PlatformStyle *_platformStyle, QWidget *parent):
     connect(overviewPage, SIGNAL(assetIssueSubClicked(QModelIndex)), createAssetsPage, SLOT(focusSubAsset(QModelIndex)));
     connect(overviewPage, SIGNAL(assetIssueUniqueClicked(QModelIndex)), createAssetsPage, SLOT(focusUniqueAsset(QModelIndex)));
     connect(overviewPage, SIGNAL(assetReissueClicked(QModelIndex)), manageAssetsPage, SLOT(focusReissueAsset(QModelIndex)));
-    /** RNV END */
+    
 }
 
 WalletView::~WalletView()
 {
 }
 
-void WalletView::setNeoxaGUI(NeoxaGUI *gui)
+void WalletView::setBitcoinGUI(BitcoinGUI *gui)
 {
     if (gui)
     {
@@ -142,7 +162,7 @@ void WalletView::setNeoxaGUI(NeoxaGUI *gui)
         // Pass through transaction notifications
         connect(this, SIGNAL(incomingTransaction(QString,int,CAmount,QString,QString,QString,QString)), gui, SLOT(incomingTransaction(QString,int,CAmount,QString,QString,QString,QString)));
 
-        // Connect HD enabled state signal 
+        // Connect HD enabled state signal
         connect(this, SIGNAL(hdEnabledStatusChanged(int)), gui, SLOT(setHDStatus(int)));
 
         // Pass through checkAssets calls to the GUI
@@ -156,6 +176,10 @@ void WalletView::setClientModel(ClientModel *_clientModel)
 
     overviewPage->setClientModel(_clientModel);
     sendCoinsPage->setClientModel(_clientModel);
+    QSettings settings;
+    if (!fLiteMode && settings.value("fShowSmartnodesTab").toBool()) {
+        smartnodeListPage->setClientModel(_clientModel);
+    }
 }
 
 void WalletView::setWalletModel(WalletModel *_walletModel)
@@ -165,12 +189,15 @@ void WalletView::setWalletModel(WalletModel *_walletModel)
     // Put transaction list in tabs
     transactionView->setModel(_walletModel);
     overviewPage->setWalletModel(_walletModel);
+    QSettings settings;
+    if (!fLiteMode && settings.value("fShowSmartnodesTab").toBool()) {
+        smartnodeListPage->setWalletModel(_walletModel);
+    }
     receiveCoinsPage->setModel(_walletModel);
     sendCoinsPage->setModel(_walletModel);
-    usedReceivingAddressesPage->setModel(_walletModel ? _walletModel->getAddressTableModel() : nullptr);
-    usedSendingAddressesPage->setModel(_walletModel ? _walletModel->getAddressTableModel() : nullptr);
+    usedReceivingAddressesPage->setModel(_walletModel->getAddressTableModel());
+    usedSendingAddressesPage->setModel(_walletModel->getAddressTableModel());
 
-    /** NEOXA START */
     assetsPage->setModel(_walletModel);
     createAssetsPage->setModel(_walletModel);
     manageAssetsPage->setModel(_walletModel);
@@ -186,14 +213,14 @@ void WalletView::setWalletModel(WalletModel *_walletModel)
         updateEncryptionStatus();
 
         // update HD status
-        Q_EMIT hdEnabledStatusChanged(_walletModel->hd44Enabled() ? NeoxaGUI::HD44_ENABLED : _walletModel->hdEnabled() ? NeoxaGUI::HD_ENABLED : NeoxaGUI::HD_DISABLED);
+        Q_EMIT hdEnabledStatusChanged(_walletModel->hdEnabled());
 
         // Balloon pop-up for new transaction
         connect(_walletModel->getTransactionTableModel(), SIGNAL(rowsInserted(QModelIndex,int,int)),
                 this, SLOT(processNewTransaction(QModelIndex,int,int)));
 
         // Ask for passphrase if needed
-        connect(_walletModel, SIGNAL(requireUnlock()), this, SLOT(unlockWallet()));
+        connect(_walletModel, SIGNAL(requireUnlock(bool)), this, SLOT(unlockWallet(bool)));
 
         // Show progress dialog
         connect(_walletModel, SIGNAL(showProgress(QString,int)), this, SLOT(showProgress(QString,int)));
@@ -210,34 +237,34 @@ void WalletView::processNewTransaction(const QModelIndex& parent, int start, int
     if (!ttm || ttm->processingQueuedTransactions())
         return;
 
-    /** NEOXA START */
-    // With the addition of asset transactions, there can be multiple transaction that need notifications
-    // so we need to loop through all new transaction that were added to the transaction table and display
-    // notifications for each individual transaction
+    //QModelIndex index = ttm->index(start, 0, parent);
+    QSettings settings;
     QString assetName = "";
-    for (int i = start; i <= end; i++) {
-        QString date = ttm->index(i, TransactionTableModel::Date, parent).data().toString();
-        qint64 amount = ttm->index(i, TransactionTableModel::Amount, parent).data(Qt::EditRole).toULongLong();
-        QString type = ttm->index(i, TransactionTableModel::Type, parent).data().toString();
-        QModelIndex index = ttm->index(i, 0, parent);
-        QString address = ttm->data(index, TransactionTableModel::AddressRole).toString();
-        QString label = ttm->data(index, TransactionTableModel::LabelRole).toString();
-        assetName = ttm->data(index, TransactionTableModel::AssetNameRole).toString();
-
-        Q_EMIT incomingTransaction(date, walletModel->getOptionsModel()->getDisplayUnit(), amount, type, address, label,
-                                   assetName);
+for (int i = start; i <= end; i++) {
+    QString date = ttm->index(i, TransactionTableModel::Date, parent).data().toString();
+    qint64 amount = ttm->index(i, TransactionTableModel::Amount, parent).data(Qt::EditRole).toULongLong();
+    if (amount == 0) continue; //skip if amount is 0
+    QString type = ttm->index(i, TransactionTableModel::Type, parent).data().toString();
+    QModelIndex index = ttm->index(i, 0, parent);
+    if (!settings.value("fShowPrivateSendPopups").toBool()) {
+        QVariant nType = ttm->data(index, TransactionTableModel::TypeRole);
+        if (nType == TransactionRecord::PrivateSendDenominate ||
+            nType == TransactionRecord::PrivateSendCollateralPayment ||
+            nType == TransactionRecord::PrivateSendMakeCollaterals ||
+            nType == TransactionRecord::PrivateSendCreateDenominations) return;
     }
-    /** NEOXA END */
+    QString address = ttm->data(index, TransactionTableModel::AddressRole).toString();
+    QString label = ttm->data(index, TransactionTableModel::LabelRole).toString();
+    assetName = ttm->data(index, TransactionTableModel::AssetNameRole).toString();
 
-    /** Everytime we get an new transaction. We should check to see if assets are enabled or not */
+    Q_EMIT incomingTransaction(date, walletModel->getOptionsModel()->getDisplayUnit(), amount, type, address, label, assetName);
+ }
     overviewPage->showAssets();
     transactionView->showAssets();
     Q_EMIT checkAssets();
-
     assetsPage->processNewTransaction();
     createAssetsPage->updateAssetList();
     manageAssetsPage->updateAssetsList();
-
 }
 
 void WalletView::gotoOverviewPage()
@@ -251,6 +278,14 @@ void WalletView::gotoHistoryPage()
     setCurrentWidget(transactionsPage);
 }
 
+void WalletView::gotoSmartnodePage()
+{
+    QSettings settings;
+    if (!fLiteMode && settings.value("fShowSmartnodesTab").toBool()) {
+        setCurrentWidget(smartnodeListPage);
+    }
+}
+
 void WalletView::gotoReceiveCoinsPage()
 {
     setCurrentWidget(receiveCoinsPage);
@@ -262,6 +297,11 @@ void WalletView::gotoSendCoinsPage(QString addr)
 
     if (!addr.isEmpty())
         sendCoinsPage->setAddress(addr);
+}
+
+void WalletView::gotoCreateAssetsPage()
+{
+    setCurrentWidget(createAssetsPage);
 }
 
 void WalletView::gotoSignMessageTab(QString addr)
@@ -303,6 +343,17 @@ void WalletView::updateEncryptionStatus()
     Q_EMIT encryptionStatusChanged(walletModel->getEncryptionStatus());
 }
 
+void WalletView::encryptWallet(bool status)
+{
+    if(!walletModel)
+        return;
+    AskPassphraseDialog dlg(status ? AskPassphraseDialog::Encrypt : AskPassphraseDialog::Decrypt, this);
+    dlg.setModel(walletModel);
+    dlg.exec();
+
+    updateEncryptionStatus();
+}
+
 void WalletView::backupWallet()
 {
     QString filename = GUIUtil::getSaveFileName(this,
@@ -329,14 +380,15 @@ void WalletView::changePassphrase()
     dlg.exec();
 }
 
-void WalletView::unlockWallet()
+void WalletView::unlockWallet(bool fForMixingOnly)
 {
     if(!walletModel)
         return;
     // Unlock wallet when requested by wallet model
-    if (walletModel->getEncryptionStatus() == WalletModel::Locked)
+
+    if (walletModel->getEncryptionStatus() == WalletModel::Locked || walletModel->getEncryptionStatus() == WalletModel::UnlockedForMixingOnly)
     {
-        AskPassphraseDialog dlg(AskPassphraseDialog::Unlock, this);
+        AskPassphraseDialog dlg(fForMixingOnly ? AskPassphraseDialog::UnlockMixing : AskPassphraseDialog::Unlock, this);
         dlg.setModel(walletModel);
         dlg.exec();
     }
@@ -344,7 +396,7 @@ void WalletView::unlockWallet()
 
 void WalletView::lockWallet()
 {
-    if (!walletModel)
+    if(!walletModel)
         return;
 
     walletModel->setWalletLocked(true);
@@ -358,8 +410,8 @@ void WalletView::getMnemonic()
     box.setText(tr("No words available."));
 
     // Check for HD-wallet and set text if not HD-wallet.
-    if(!walletModel->hd44Enabled())
-        box.setText(tr("This wallet is not a HD wallet, words not supported."));
+    //if(!walletModel->hd44Enabled())
+    //    box.setText(tr("This wallet is not a HD wallet, words not supported."));
 
     // Unlock wallet requested by wallet model
     WalletView::unlockWallet();
@@ -398,6 +450,7 @@ void WalletView::showProgress(const QString &title, int nProgress)
     if (nProgress == 0)
     {
         progressDialog = new QProgressDialog(title, "", 0, 100);
+        progressDialog->setStyleSheet(GUIUtil::loadStyleSheet());
         progressDialog->setWindowModality(Qt::ApplicationModal);
         progressDialog->setMinimumDuration(0);
         progressDialog->setCancelButton(0);
@@ -421,8 +474,13 @@ void WalletView::requestedSyncWarningInfo()
     Q_EMIT outOfSyncWarningClicked();
 }
 
+/** Update wallet with the sum of the selected transactions */
+void WalletView::trxAmount(QString amount)
+{
+    transactionSum->setText(amount);
+}
+
 bool fFirstVisit = true;
-/** NEOXA START */
 void WalletView::gotoAssetsPage()
 {
     if (fFirstVisit){
@@ -431,11 +489,6 @@ void WalletView::gotoAssetsPage()
     }
     setCurrentWidget(assetsPage);
     assetsPage->focusAssetListBox();
-}
-
-void WalletView::gotoCreateAssetsPage()
-{
-    setCurrentWidget(createAssetsPage);
 }
 
 void WalletView::gotoManageAssetsPage()
@@ -447,4 +500,3 @@ void WalletView::gotoRestrictedAssetsPage()
 {
     setCurrentWidget(restrictedAssetsPage);
 }
-/** NEOXA END */

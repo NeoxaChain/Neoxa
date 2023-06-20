@@ -1,6 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2016 The Bitcoin Core developers
-// Copyright (c) 2017-2021 The Raven Core developers
+// Copyright (c) 2009-2015 The Bitcoin Core developers
+// Copyright (c) 2014-2019 The Dash Core developers
+// Copyright (c) 2020 The Neoxa developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -16,6 +17,7 @@
 #include "util.h"
 #include "utiltime.h"
 #include "wallet/wallet.h"
+#include "validation.h"
 
 #include <atomic>
 
@@ -42,9 +44,9 @@ bool CWalletDB::WritePurpose(const std::string& strAddress, const std::string& s
     return WriteIC(std::make_pair(std::string("purpose"), strAddress), strPurpose);
 }
 
-bool CWalletDB::ErasePurpose(const std::string& strAddress)
+bool CWalletDB::ErasePurpose(const std::string& strPurpose)
 {
-    return EraseIC(std::make_pair(std::string("purpose"), strAddress));
+    return EraseIC(std::make_pair(std::string("purpose"), strPurpose));
 }
 
 bool CWalletDB::WriteTx(const CWalletTx& wtx)
@@ -129,6 +131,11 @@ bool CWalletDB::ReadBestBlock(CBlockLocator& locator)
 bool CWalletDB::WriteOrderPosNext(int64_t nOrderPosNext)
 {
     return WriteIC(std::string("orderposnext"), nOrderPosNext);
+}
+
+bool CWalletDB::WriteDefaultKey(const CPubKey& vchPubKey)
+{
+    return WriteIC(std::string("defaultkey"), vchPubKey);
 }
 
 bool CWalletDB::ReadPool(int64_t nPool, CKeyPool& keypool)
@@ -241,7 +248,8 @@ public:
     }
 };
 
-bool ReadKeyValue(CWallet* pwallet, CDataStream& ssKey, CDataStream& ssValue,
+bool
+ReadKeyValue(CWallet* pwallet, CDataStream& ssKey, CDataStream& ssValue,
              CWalletScanState &wss, std::string& strType, std::string& strErr)
 {
     try {
@@ -253,13 +261,13 @@ bool ReadKeyValue(CWallet* pwallet, CDataStream& ssKey, CDataStream& ssValue,
         {
             std::string strAddress;
             ssKey >> strAddress;
-            ssValue >> pwallet->mapAddressBook[DecodeDestination(strAddress)].name;
+            ssValue >> pwallet->mapAddressBook[CBitcoinAddress(strAddress).Get()].name;
         }
         else if (strType == "purpose")
         {
             std::string strAddress;
             ssKey >> strAddress;
-            ssValue >> pwallet->mapAddressBook[DecodeDestination(strAddress)].purpose;
+            ssValue >> pwallet->mapAddressBook[CBitcoinAddress(strAddress).Get()].purpose;
         }
         else if (strType == "tx")
         {
@@ -268,15 +276,9 @@ bool ReadKeyValue(CWallet* pwallet, CDataStream& ssKey, CDataStream& ssValue,
             CWalletTx wtx;
             ssValue >> wtx;
             CValidationState state;
-            if (!(CheckTransaction(wtx, state) && (wtx.GetHash() == hash) && state.IsValid())) {
-                // If a client has a wallet.dat that contains asset transactions, but we are syncing the chain.
-                // we want to make sure that we don't fail to load this wallet transaction just because it is an asset transaction
-                // before asset are active
-                if (state.GetRejectReason() != "bad-txns-is-asset-and-asset-not-active" && state.GetRejectReason() != "bad-txns-transfer-asset-bad-deserialize") {
-                    strErr = state.GetRejectReason();
-                    return false;
-                }
-            }
+            //skip founder check here
+            if (!(CheckTransaction(wtx, state, 0, 0) && (wtx.GetHash() == hash) && state.IsValid()))
+                return false;
 
             // Undo serialize changes in 31600
             if (31404 <= wtx.fTimeReceivedIsTxTime && wtx.fTimeReceivedIsTxTime <= 31703)
@@ -454,14 +456,7 @@ bool ReadKeyValue(CWallet* pwallet, CDataStream& ssKey, CDataStream& ssValue,
         }
         else if (strType == "defaultkey")
         {
-            // We don't want or need the default key, but if there is one set,
-            // we want to make sure that it is valid so that we can detect corruption
-            CPubKey vchPubKey;
-            ssValue >> vchPubKey;
-            if (!vchPubKey.IsValid()) {
-                strErr = "Error reading wallet database: Default Key corrupt";
-                return false;
-            }
+            ssValue >> pwallet->vchDefaultKey;
         }
         else if (strType == "pool")
         {
@@ -469,7 +464,6 @@ bool ReadKeyValue(CWallet* pwallet, CDataStream& ssKey, CDataStream& ssValue,
             ssKey >> nIndex;
             CKeyPool keypool;
             ssValue >> keypool;
-
             pwallet->LoadKeyPool(nIndex, keypool);
         }
         else if (strType == "version")
@@ -500,7 +494,7 @@ bool ReadKeyValue(CWallet* pwallet, CDataStream& ssKey, CDataStream& ssValue,
             ssKey >> strAddress;
             ssKey >> strKey;
             ssValue >> strValue;
-            if (!pwallet->LoadDestData(DecodeDestination(strAddress), strKey, strValue))
+            if (!pwallet->LoadDestData(CBitcoinAddress(strAddress).Get(), strKey, strValue))
             {
                 strErr = "Error reading wallet database: LoadDestData failed";
                 return false;
@@ -508,77 +502,40 @@ bool ReadKeyValue(CWallet* pwallet, CDataStream& ssKey, CDataStream& ssValue,
         }
         else if (strType == "hdchain")
         {
-            CHDChain chain(pwallet);
+            CHDChain chain;
             ssValue >> chain;
-            if (!pwallet->SetHDChain(chain, true))
+            if (!pwallet->SetHDChainSingle(chain, true))
             {
                 strErr = "Error reading wallet database: SetHDChain failed";
                 return false;
             }
         }
-        else if (strType == "cbip39words")
+        else if (strType == "chdchain")
         {
-            std::pair<uint256,std::vector<unsigned char> > valuePair;
-            ssValue >> valuePair;
-
-            if (!pwallet->LoadCryptedWords(valuePair.first, valuePair.second))
+            CHDChain chain;
+            ssValue >> chain;
+            if (!pwallet->SetCryptedHDChainSingle(chain, true))
             {
-                strErr = "Error reading wallet database: LoadCryptedWords failed";
+                strErr = "Error reading wallet database: SetHDCryptedChain failed";
                 return false;
             }
         }
-        else if (strType == "cbip39passphrase")
+        else if (strType == "hdpubkey")
         {
-            std::vector<unsigned char> vchPassphrase;
-            ssValue >> vchPassphrase;
+            CPubKey vchPubKey;
+            ssKey >> vchPubKey;
 
-            if (!pwallet->LoadCryptedPassphrase(vchPassphrase))
+            CHDPubKey hdPubKey;
+            ssValue >> hdPubKey;
+
+            if(vchPubKey != hdPubKey.extPubKey.pubkey)
             {
-                strErr = "Error reading wallet database: LoadCryptedPassphrase failed";
+                strErr = "Error reading wallet database: CHDPubKey corrupt";
                 return false;
             }
-        }
-        else if (strType == "cbip39vchseed")
-        {
-            std::vector<unsigned char> vchSeed;
-            ssValue >> vchSeed;
-
-            if (!pwallet->LoadCryptedVchSeed(vchSeed))
+            if (!pwallet->LoadHDPubKey(hdPubKey))
             {
-                strErr = "Error reading wallet database: LoadCryptedVchSeed failed";
-                return false;
-            }
-        }
-        else if (strType == "bip39words")
-        {
-            std::pair<uint256,std::vector<unsigned char> > valuePair;
-            ssValue >> valuePair;
-
-            if (!pwallet->LoadWords(valuePair.first, valuePair.second))
-            {
-                strErr = "Error reading wallet database: LoadWords failed";
-                return false;
-            }
-        }
-        else if (strType == "bip39passphrase")
-        {
-            std::vector<unsigned char> vchPassphrase;
-            ssValue >> vchPassphrase;
-
-            if (!pwallet->LoadPassphrase(vchPassphrase))
-            {
-                strErr = "Error reading wallet database: LoadPassphrase failed";
-                return false;
-            }
-        }
-        else if (strType == "bip39vchseed")
-        {
-            std::vector<unsigned char> vchSeed;
-            ssValue >> vchSeed;
-
-            if (!pwallet->LoadVchSeed(vchSeed))
-            {
-                strErr = "Error reading wallet database: LoadVchSeed failed";
+                strErr = "Error reading wallet database: LoadHDPubKey failed";
                 return false;
             }
         }
@@ -592,16 +549,18 @@ bool ReadKeyValue(CWallet* pwallet, CDataStream& ssKey, CDataStream& ssValue,
 bool CWalletDB::IsKeyType(const std::string& strType)
 {
     return (strType== "key" || strType == "wkey" ||
-            strType == "mkey" || strType == "ckey");
+            strType == "mkey" || strType == "ckey" ||
+            strType == "hdchain" || strType == "chdchain");
 }
 
 DBErrors CWalletDB::LoadWallet(CWallet* pwallet)
 {
+    pwallet->vchDefaultKey = CPubKey();
     CWalletScanState wss;
     bool fNoncriticalErrors = false;
     DBErrors result = DB_LOAD_OK;
 
-    LOCK(pwallet->cs_wallet);
+    LOCK2(cs_main, pwallet->cs_wallet);
     try {
         int nMinVersion = 0;
         if (batch.Read((std::string)"minversion", nMinVersion))
@@ -639,23 +598,25 @@ DBErrors CWalletDB::LoadWallet(CWallet* pwallet)
             {
                 // losing keys is considered a catastrophic error, anything else
                 // we assume the user can live with:
-                if (IsKeyType(strType) || strType == "defaultkey")
+                if (IsKeyType(strType))
                     result = DB_CORRUPT;
                 else
                 {
-                    LogPrintf("DB failed to Read Key Value. Type: %s, Error: %s\n", strType, strErr);
                     // Leave other errors alone, if we try to fix them we might make things worse.
                     fNoncriticalErrors = true; // ... but do warn the user there is something wrong.
-                    if (strType == "tx") {
+                    if (strType == "tx")
                         // Rescan if there is a bad transaction record:
                         gArgs.SoftSetBoolArg("-rescan", true);
-                    }
                 }
             }
             if (!strErr.empty())
                 LogPrintf("%s\n", strErr);
         }
         pcursor->close();
+
+        // Store initial external keypool size since we mostly use external keys in mixing
+        pwallet->nKeysLeftSinceAutoBackup = pwallet->KeypoolCountExternalKeys();
+        LogPrintf("nKeysLeftSinceAutoBackup: %d\n", pwallet->nKeysLeftSinceAutoBackup);
     }
     catch (const boost::thread_interrupted&) {
         throw;
@@ -697,7 +658,7 @@ DBErrors CWalletDB::LoadWallet(CWallet* pwallet)
     pwallet->laccentries.clear();
     ListAccountCreditDebit("*", pwallet->laccentries);
     for (CAccountingEntry& entry : pwallet->laccentries) {
-        pwallet->wtxOrdered.insert(make_pair(entry.nOrderPos, CWallet::TxPair(nullptr, &entry)));
+        pwallet->wtxOrdered.insert(make_pair(entry.nOrderPos, CWallet::TxPair((CWalletTx*)0, &entry)));
     }
 
     return result;
@@ -878,7 +839,7 @@ bool CWalletDB::RecoverKeysOnlyFilter(void *callbackData, CDataStream ssKey, CDa
         fReadOK = ReadKeyValue(dummyWallet, ssKey, ssValue,
                                dummyWss, strType, strErr);
     }
-    if (!IsKeyType(strType) && strType != "hdchain")
+    if (!IsKeyType(strType) && strType != "hdpubkey")
         return false;
     if (!fReadOK)
     {
@@ -904,75 +865,6 @@ bool CWalletDB::WriteDestData(const std::string &address, const std::string &key
     return WriteIC(std::make_pair(std::string("destdata"), std::make_pair(address, key)), value);
 }
 
-bool CWalletDB::WriteBip39Words(const uint256& hash, const std::vector<unsigned char>& vchWords, bool fEncrypted)
-{
-    std::string key = fEncrypted ? "c" : "";
-    key.append("bip39words");
-    return WriteIC(key, std::make_pair(hash,vchWords), true);
-}
-
-bool CWalletDB::WriteBip39Passphrase(const std::vector<unsigned char>& vchPassphrase,  bool fEncrypted)
-{
-    std::string key = fEncrypted ? "c" : "";
-    key.append("bip39passphrase");
-    return WriteIC(key, vchPassphrase, true);
-}
-
-bool CWalletDB::WriteBip39VchSeed(const std::vector<unsigned char>& vchSeed,  bool fEncrypted)
-{
-    std::string key = fEncrypted ? "c" : "";
-    key.append("bip39vchseed");
-    return WriteIC(key, vchSeed, true);
-}
-
-bool CWalletDB::ReadBip39Words(uint256& hash, std::vector<unsigned char>& vchWords,  bool fEncrypted)
-{
-    std::string key = fEncrypted ? "c" : "";
-    key.append("bip39words");
-    std::pair<uint256, std::vector<unsigned char>> valuePair;
-    bool ret = batch.Read(key, valuePair);
-    if (ret) {
-        hash = valuePair.first;
-        vchWords = valuePair.second;
-    }
-    return ret;
-}
-
-bool CWalletDB::ReadBip39Passphrase(std::vector<unsigned char>& vchPassphrase,  bool fEncrypted)
-{
-    std::string key = fEncrypted ? "c" : "";
-    key.append("bip39passphrase");
-    return batch.Read(key, vchPassphrase);
-}
-
-bool CWalletDB::ReadBip39VchSeed(std::vector<unsigned char>& vchSeed,  bool fEncrypted)
-{
-    std::string key = fEncrypted ? "c" : "";
-    key.append("bip39vchseed");
-    return batch.Read(key, vchSeed);
-}
-
-bool CWalletDB::EraseBip39Words(bool fEncrypted)
-{
-    std::string key = fEncrypted ? "c" : "";
-    key.append("bip39words");
-    return EraseIC(key);
-}
-
-bool CWalletDB::EraseBip39Passphrase(bool fEncrypted)
-{
-    std::string key = fEncrypted ? "c" : "";
-    key.append("bip39passphrase");
-    return EraseIC(key);
-}
-
-bool CWalletDB::EraseBip39VchSeed(bool fEncrypted)
-{
-    std::string key = fEncrypted ? "c" : "";
-    key.append("bip39vchseed");
-    return EraseIC(key);
-}
-
 bool CWalletDB::EraseDestData(const std::string &address, const std::string &key)
 {
     return EraseIC(std::make_pair(std::string("destdata"), std::make_pair(address, key)));
@@ -981,6 +873,24 @@ bool CWalletDB::EraseDestData(const std::string &address, const std::string &key
 bool CWalletDB::WriteHDChain(const CHDChain& chain)
 {
     return WriteIC(std::string("hdchain"), chain);
+}
+
+bool CWalletDB::WriteCryptedHDChain(const CHDChain& chain)
+{
+    if (!WriteIC(std::string("chdchain"), chain))
+        return false;
+
+    EraseIC(std::string("hdchain"));
+
+    return true;
+}
+
+bool CWalletDB::WriteHDPubKey(const CHDPubKey& hdPubKey, const CKeyMetadata& keyMeta)
+{
+    if (!WriteIC(std::make_pair(std::string("keymeta"), hdPubKey.extPubKey.pubkey), keyMeta, false))
+        return false;
+
+    return WriteIC(std::make_pair(std::string("hdpubkey"), hdPubKey.extPubKey.pubkey), hdPubKey, false);
 }
 
 bool CWalletDB::TxnBegin()
@@ -1006,44 +916,4 @@ bool CWalletDB::ReadVersion(int& nVersion)
 bool CWalletDB::WriteVersion(int nVersion)
 {
     return batch.WriteVersion(nVersion);
-}
-
-void CHDChain::SetSeedFromSeedId()
-{
-    // try to get the seed
-	CKey seed;
-	if (pwallet && !pwallet->IsLocked()) {
-        if (!pwallet->GetKey(seed_id, seed)) {
-            throw std::runtime_error(std::string(__func__) + ": seed not found");
-        }
-        vchSeed = SecureVector(seed.begin(), seed.end());
-	}
-
-	if (!pwallet)
-        throw std::runtime_error(std::string(__func__) + ": wallet not found");
-}
-
-bool CHDChain::SetMnemonic(const SecureString& ssMnemonic, const SecureString& ssMnemonicPassphrase, SecureVector& vchSeed)
-{
-    SecureString ssMnemonicTmp = ssMnemonic;
-
-    // can't (re)set mnemonic if seed was already set
-    if (!IsNull())
-        return false;
-
-    // empty mnemonic i.e. "generate a new one"
-    if (ssMnemonic.empty()) {
-        ssMnemonicTmp = CMnemonic::Generate(bUse_bip44 ? 128 : 256);
-    }
-    // NOTE: default mnemonic passphrase is an empty string
-    if (!CMnemonic::Check(ssMnemonicTmp)) {
-        throw std::runtime_error(std::string(__func__) + ": invalid mnemonic: `" + std::string(ssMnemonicTmp.c_str()) + "`");
-    }
-
-    CMnemonic::ToSeed(ssMnemonicTmp, ssMnemonicPassphrase, vchSeed);
-
-    vchMnemonic = SecureVector(ssMnemonicTmp.begin(), ssMnemonicTmp.end());
-    vchMnemonicPassphrase = SecureVector(ssMnemonicPassphrase.begin(), ssMnemonicPassphrase.end());
-
-    return true;
 }

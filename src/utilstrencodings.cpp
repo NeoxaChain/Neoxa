@@ -1,6 +1,5 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2016 The Bitcoin Core developers
-// Copyright (c) 2017-2021 The Raven Core developers
+// Copyright (c) 2009-2015 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -510,7 +509,7 @@ bool ParseUInt32(const std::string& str, uint32_t *out)
         n <= std::numeric_limits<uint32_t>::max();
 }
 
-bool ParseUInt64(const std::string& str, uint64_t *out, int base)
+bool ParseUInt64(const std::string& str, uint64_t *out)
 {
     if (!ParsePrechecks(str))
         return false;
@@ -518,7 +517,7 @@ bool ParseUInt64(const std::string& str, uint64_t *out, int base)
         return false;
     char *endp = nullptr;
     errno = 0; // strtoull will not set errno if valid
-    unsigned long long int n = strtoull(str.c_str(), &endp, base);
+    unsigned long long int n = strtoull(str.c_str(), &endp, 10);
     if(out) *out = (uint64_t)n;
     // Note that strtoull returns a *unsigned long long int*, so even if it doesn't report an over/underflow
     // we still have to check that the returned value is within the range of an *uint64_t*.
@@ -721,11 +720,11 @@ bool ParseFixedPoint(const std::string &val, int decimals, int64_t *amount_out)
         return false; /* cannot represent values larger than or equal to 10^(18-decimals) */
 
     for (int i=0; i < exponent; ++i) {
-        if (mantissa > (420000000000000000LL) || mantissa < -(UPPER_BOUND / 10LL))
+        if (mantissa > (UPPER_BOUND / 10LL) || mantissa < -(UPPER_BOUND / 10LL))
             return false; /* overflow */
         mantissa *= 10;
     }
-    if (mantissa > 4200000000000000000LL || mantissa < -UPPER_BOUND)
+    if (mantissa > UPPER_BOUND || mantissa < -UPPER_BOUND)
         return false; /* overflow */
 
     if (amount_out)
@@ -733,4 +732,3 @@ bool ParseFixedPoint(const std::string &val, int decimals, int64_t *amount_out)
 
     return true;
 }
-

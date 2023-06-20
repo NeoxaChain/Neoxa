@@ -1,6 +1,5 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2016 The Bitcoin Core developers
-// Copyright (c) 2017-2021 The Raven Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -19,19 +18,14 @@
 CAmount GetDustThreshold(const CTxOut& txout, const CFeeRate& dustRelayFeeIn)
 {
     // "Dust" is defined in terms of dustRelayFee,
-    // which has units satoshis-per-kilobyte.
+    // which has units duffs-per-kilobyte.
     // If you'd pay more in fees than the value of the output
     // to spend something, then we consider it dust.
-    // A typical spendable non-segwit txout is 34 bytes big, and will
+    // A typical spendable txout is 34 bytes big, and will
     // need a CTxIn of at least 148 bytes to spend:
     // so dust is a spendable txout less than
-    // 182*dustRelayFee/1000 (in satoshis).
-    // 546 satoshis at the default rate of 3000 sat/kB.
-    // A typical spendable segwit txout is 31 bytes big, and will
-    // need a CTxIn of at least 67 bytes to spend:
-    // so dust is a spendable txout less than
-    // 98*dustRelayFee/1000 (in satoshis).
-    // 294 satoshis at the default rate of 3000 sat/kB.
+    // 182*dustRelayFee/1000 (in duffs).
+    // 546 duffs at the default rate of 3000 duff/kB.
     if (txout.scriptPubKey.IsUnspendable())
         return 0;
 
@@ -52,20 +46,37 @@ CAmount GetDustThreshold(const CTxOut& txout, const CFeeRate& dustRelayFeeIn)
 
 bool IsDust(const CTxOut& txout, const CFeeRate& dustRelayFeeIn)
 {
-
     if (txout.scriptPubKey.IsAssetScript())
         return false;
     else
         return (txout.nValue < GetDustThreshold(txout, dustRelayFeeIn));
 }
 
-bool IsStandard(const CScript& scriptPubKey, txnouttype& whichType, const bool witnessEnabled) {
+    /**
+     * Check transaction inputs to mitigate two
+     * potential denial-of-service attacks:
+     * 
+     * 1. scriptSigs with extra data stuffed into them,
+     *    not consumed by scriptPubKey (or P2SH script)
+     * 2. P2SH scripts with a crazy number of expensive
+     *    CHECKSIG/CHECKMULTISIG operations
+     *
+     * Why bother? To avoid denial-of-service attacks; an attacker
+     * can submit a standard HASH... OP_EQUAL transaction,
+     * which will get accepted into blocks. The redemption
+     * script can be anything; an attacker could use a very
+     * expensive-to-check-upon-redemption script like:
+     *   DUP CHECKSIG DROP ... repeated 100 times... OP_1
+     */
+
+bool IsStandard(const CScript& scriptPubKey, txnouttype& whichType, const bool witnessEnabled)
+{
     std::vector<std::vector<unsigned char> > vSolutions;
     if (!Solver(scriptPubKey, whichType, vSolutions))
         return false;
 
-
-    if (whichType == TX_MULTISIG) {
+    if (whichType == TX_MULTISIG)
+    {
         unsigned char m = vSolutions.front()[0];
         unsigned char n = vSolutions.back()[0];
         // Support up to x-of-3 multisig txns as standard
@@ -81,7 +92,7 @@ bool IsStandard(const CScript& scriptPubKey, txnouttype& whichType, const bool w
     else if (!witnessEnabled && (whichType == TX_WITNESS_V0_KEYHASH || whichType == TX_WITNESS_V0_SCRIPTHASH))
         return false;
 
-    return whichType != TX_NONSTANDARD ;
+    return whichType != TX_NONSTANDARD;
 }
 
 bool IsStandardTx(const CTransaction& tx, std::string& reason, const bool witnessEnabled)
@@ -94,9 +105,9 @@ bool IsStandardTx(const CTransaction& tx, std::string& reason, const bool witnes
     // Extremely large transactions with lots of inputs can cost the network
     // almost as much to process as they cost the sender in fees, because
     // computing signature hashes is O(ninputs*txsize). Limiting transactions
-    // to MAX_STANDARD_TX_WEIGHT mitigates CPU exhaustion attacks.
-    unsigned int sz = GetTransactionWeight(tx);
-    if (sz >= MAX_STANDARD_TX_WEIGHT) {
+    // to MAX_STANDARD_TX_SIZE mitigates CPU exhaustion attacks.
+    unsigned int sz = GetSerializeSize(tx, SER_NETWORK, CTransaction::CURRENT_VERSION);
+    if (sz >= MAX_STANDARD_TX_SIZE) {
         reason = "tx-size";
         return false;
     }
@@ -147,8 +158,8 @@ bool IsStandardTx(const CTransaction& tx, std::string& reason, const bool witnes
         reason = "multi-op-return";
         return false;
     }
-
-    // only one hundred OP_NEOXA_ASSET txout is permitted
+    
+    // only one hundred OP_NEOX_ASSET txout is permitted
     if (nAssetDataOut > 100) {
         reason = "tomany-op-neox-asset";
         return false;
@@ -157,22 +168,6 @@ bool IsStandardTx(const CTransaction& tx, std::string& reason, const bool witnes
     return true;
 }
 
-/**
- * Check transaction inputs to mitigate two
- * potential denial-of-service attacks:
- *
- * 1. scriptSigs with extra data stuffed into them,
- *    not consumed by scriptPubKey (or P2SH script)
- * 2. P2SH scripts with a crazy number of expensive
- *    CHECKSIG/CHECKMULTISIG operations
- *
- * Why bother? To avoid denial-of-service attacks; an attacker
- * can submit a standard HASH... OP_EQUAL transaction,
- * which will get accepted into blocks. The redemption
- * script can be anything; an attacker could use a very
- * expensive-to-check-upon-redemption script like:
- *   DUP CHECKSIG DROP ... repeated 100 times... OP_1
- */
 bool AreInputsStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs)
 {
     if (tx.IsCoinBase())

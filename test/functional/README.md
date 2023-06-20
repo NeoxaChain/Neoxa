@@ -17,15 +17,32 @@ don't have test cases for.
 
 #### Style guidelines
 
-- Where possible, try to adhere to [PEP-8 guidelines]([https://www.python.org/dev/peps/pep-0008/)
+- Where possible, try to adhere to [PEP-8 guidelines](https://www.python.org/dev/peps/pep-0008/)
 - Use a python linter like flake8 before submitting PRs to catch common style
   nits (eg trailing whitespace, unused imports, etc)
+- See [the python lint script](/test/lint/lint-python.sh) that checks for violations that
+  could lead to bugs and issues in the test code.
 - Avoid wildcard imports where possible
 - Use a module-level docstring to describe what the test is testing, and how it
   is testing it.
-- When subclassing the NeoxaTestFramwork, place overrides for the
+- When subclassing the BitcoinTestFramwork, place overrides for the
   `set_test_params()`, `add_options()` and `setup_xxxx()` methods at the top of
   the subclass, then locally-defined helper methods, then the `run_test()` method.
+- Use `'{}'.format(x)` for string formatting, not `'%s' % x`.
+
+#### Naming guidelines
+
+- Name the test `<area>_test.py`, where area can be one of the following:
+    - `feature` for tests for full features that aren't wallet/mining/mempool, eg `feature_rbf.py`
+    - `interface` for tests for other interfaces (REST, ZMQ, etc), eg `interface_rest.py`
+    - `mempool` for tests for mempool behaviour, eg `mempool_reorg.py`
+    - `mining` for tests for mining features, eg `mining_prioritisetransaction.py`
+    - `p2p` for tests that explicitly test the p2p interface, eg `p2p_disconnect_ban.py`
+    - `rpc` for tests for individual RPC methods or features, eg `rpc_listtransactions.py`
+    - `wallet` for tests for wallet features, eg `wallet_keypool.py`
+- use an underscore to separate words
+    - exception: for tests for specific RPCs or command line options which don't include underscores, name the test after the exact RPC or argument name, eg `rpc_decodescript.py`, not `rpc_decode_script.py`
+- Don't use the redundant word `test` in the name, eg `interface_zmq.py`, not `interface_zmq_test.py`
 
 #### General test-writing advice
 
@@ -39,7 +56,7 @@ don't have test cases for.
 - Set the `self.setup_clean_chain` variable in `set_test_params()` to control whether
   or not to use the cached data directories. The cached data directories
   contain a 200-block pre-mined blockchain and wallets for four nodes. Each node
-  has 25 mature blocks (25x5000=125000 NEOX) in its wallet.
+  has 25 mature blocks (25x500=12500 NEOXA) in its wallet.
 - When calling RPCs with lots of arguments, consider using named keyword
   arguments instead of positional arguments to make the intent of the call
   clear to readers.
@@ -63,22 +80,22 @@ wrappers for them, `msg_block`, `msg_tx`, etc).
 with the neoxad(s) being tested (using python's asyncore package); the other
 implements the test logic.
 
-- `NodeConn` is the class used to connect to a neoxad.  If you implement
-a callback class that derives from `NodeConnCB` and pass that to the
-`NodeConn` object, your code will receive the appropriate callbacks when
-events of interest arrive.
+- `P2PConnection` is the class used to connect to a neoxad.  `P2PInterface`
+contains the higher level logic for processing P2P payloads and connecting to
+the Bitcoin Core node application logic. For custom behaviour, subclass the
+P2PInterface object and override the callback methods.
 
-- Call `NetworkThread.start()` after all `NodeConn` objects are created to
+- Call `network_thread_start()` after all `P2PInterface` objects are created to
 start the networking thread.  (Continue with the test logic in your existing
 thread.)
 
 - Can be used to write tests where specific P2P protocol behavior is tested.
-Examples tests are `p2p-accept-block.py`, `p2p-compactblocks.py`.
+Examples tests are `p2p_unrequested_blocks.py`, `p2p_compactblocks.py`.
 
 ### test-framework modules
 
 #### [test_framework/authproxy.py](test_framework/authproxy.py)
-Taken from the [python-NeoxaRPC repository](https://github.com/jgarzik/python-NeoxaRPC).
+Taken from the [python-bitcoinrpc repository](https://github.com/jgarzik/python-bitcoinrpc).
 
 #### [test_framework/test_framework.py](test_framework/test_framework.py)
 Base class for functional tests.
@@ -90,10 +107,10 @@ Generally useful functions.
 Basic code to support P2P connectivity to a neoxad.
 
 #### [test_framework/script.py](test_framework/script.py)
-Utilities for manipulating transaction scripts (originally from python-neoxalib)
+Utilities for manipulating transaction scripts (originally from python-bitcoinlib)
 
 #### [test_framework/key.py](test_framework/key.py)
-Wrapper around OpenSSL EC_Key (originally from python-neoxalib)
+Wrapper around OpenSSL EC_Key (originally from python-bitcoinlib)
 
 #### [test_framework/bignum.py](test_framework/bignum.py)
 Helpers for script.py

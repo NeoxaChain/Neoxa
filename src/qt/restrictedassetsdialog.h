@@ -1,11 +1,10 @@
 ﻿// Copyright (c) 2011-2016 The Bitcoin Core developers
 // Copyright (c) 2017-2019 The Raven Core developers
-// Copyright (c) 2020-2021 The Neoxa Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef NEOXA_QT_RESTRICTEDASSETSDIALOG_H
-#define NEOXA_QT_RESTRICTEDASSETSDIALOG_H
+#ifndef RAVEN_QT_RESTRICTEDASSETSDIALOG_H
+#define RAVEN_QT_RESTRICTEDASSETSDIALOG_H
 
 #include "walletmodel.h"
 
@@ -49,9 +48,9 @@ public:
      */
     QWidget *setupTabChain(QWidget *prev);
 public Q_SLOTS:
-    void setBalance(const CAmount& balance, const CAmount& unconfirmedBalance, const CAmount& immatureBalance,
+    void setBalance(const CAmount& balance, const CAmount& unconfirmedBalance, const CAmount& immatureBalance, const CAmount& anonymizedBalance,
                     const CAmount& watchOnlyBalance, const CAmount& watchUnconfBalance, const CAmount& watchImmatureBalance);
-
+    
 
 private:
     Ui::RestrictedAssetsDialog *ui;
@@ -70,8 +69,8 @@ private Q_SLOTS:
 
 
     Q_SIGNALS:
-            // Fired when a message should be reported to the user
-            void message(const QString &title, const QString &message, unsigned int style);
+        // Fired when a message should be reported to the user
+        void message(const QString &title, const QString &message, unsigned int style);
 };
 
-#endif // NEOXA_QT_RESTRICTEDASSETSSDIALOG_H
+#endif // RAVEN_QT_RESTRICTEDASSETSSDIALOG_H

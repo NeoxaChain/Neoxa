@@ -1,6 +1,4 @@
-// Copyright (c) 2011-2016 The Bitcoin Core developers
-// Copyright (c) 2017-2019 The Raven Core developers
-// Copyright (c) 2020-2021 The Neoxa Core developers
+// Copyright (c) 2011-2015 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -9,14 +7,13 @@
 
 #include "addressbookpage.h"
 #include "addresstablemodel.h"
-#include "neoxaunits.h"
+#include "bitcoinunits.h"
 #include "guiutil.h"
 #include "optionsmodel.h"
 #include "platformstyle.h"
 #include "receiverequestdialog.h"
 #include "recentrequeststablemodel.h"
 #include "walletmodel.h"
-#include "guiconstants.h"
 
 #include <QAction>
 #include <QCursor>
@@ -24,7 +21,6 @@
 #include <QMessageBox>
 #include <QScrollBar>
 #include <QTextDocument>
-#include <QGraphicsDropShadowEffect>
 
 ReceiveCoinsDialog::ReceiveCoinsDialog(const PlatformStyle *_platformStyle, QWidget *parent) :
     QDialog(parent),
@@ -34,17 +30,17 @@ ReceiveCoinsDialog::ReceiveCoinsDialog(const PlatformStyle *_platformStyle, QWid
     platformStyle(_platformStyle)
 {
     ui->setupUi(this);
-
+    
     if (!_platformStyle->getImagesOnButtons()) {
         ui->clearButton->setIcon(QIcon());
         ui->receiveButton->setIcon(QIcon());
         ui->showRequestButton->setIcon(QIcon());
         ui->removeRequestButton->setIcon(QIcon());
     } else {
-        ui->clearButton->setIcon(_platformStyle->SingleColorIcon(":/icons/remove"));
-        ui->receiveButton->setIcon(_platformStyle->SingleColorIcon(":/icons/receiving_addresses"));
-        ui->showRequestButton->setIcon(_platformStyle->SingleColorIcon(":/icons/edit"));
-        ui->removeRequestButton->setIcon(_platformStyle->SingleColorIcon(":/icons/remove"));
+        ui->clearButton->setIcon(QIcon(":/icons/remove"));
+        ui->receiveButton->setIcon(QIcon(":/icons/receiving_addresses"));
+        ui->showRequestButton->setIcon(QIcon(":/icons/edit"));
+        ui->removeRequestButton->setIcon(QIcon(":/icons/remove"));
     }
 
     // context menu actions
@@ -68,9 +64,6 @@ ReceiveCoinsDialog::ReceiveCoinsDialog(const PlatformStyle *_platformStyle, QWid
     connect(copyAmountAction, SIGNAL(triggered()), this, SLOT(copyAmount()));
 
     connect(ui->clearButton, SIGNAL(clicked()), this, SLOT(clear()));
-
-    setupRequestFrame(platformStyle);
-    setupHistoryFrame(platformStyle);
 }
 
 void ReceiveCoinsDialog::setModel(WalletModel *_model)
@@ -100,8 +93,6 @@ void ReceiveCoinsDialog::setModel(WalletModel *_model)
             SLOT(recentRequestsView_selectionChanged(QItemSelection, QItemSelection)));
         // Last 2 columns are set by the columnResizingFixer, when the table geometry is ready.
         columnResizingFixer = new GUIUtil::TableViewLastColumnResizingFixer(tableView, AMOUNT_MINIMUM_COLUMN_WIDTH, DATE_COLUMN_WIDTH, this);
-
-        tableView->show();
     }
 }
 
@@ -127,59 +118,6 @@ void ReceiveCoinsDialog::reject()
 void ReceiveCoinsDialog::accept()
 {
     clear();
-}
-
-void ReceiveCoinsDialog::setupRequestFrame(const PlatformStyle *platformStyle)
-{
-    /** Update the coincontrol frame */
-    ui->frame2->setStyleSheet(QString(".QFrame {background-color: %1; border: none;}").arg(platformStyle->WidgetBackGroundColor().name()));
-    /** Create the shadow effects on the frames */
-
-    ui->frame2->setGraphicsEffect(GUIUtil::getShadowEffect());
-
-    ui->label_5->setStyleSheet(STRING_LABEL_COLOR);
-
-    ui->label_2->setStyleSheet(STRING_LABEL_COLOR);
-    ui->label_2->setFont(GUIUtil::getSubLabelFont());
-
-    ui->label->setStyleSheet(STRING_LABEL_COLOR);
-    ui->label->setFont(GUIUtil::getSubLabelFont());
-
-    ui->label_3->setStyleSheet(STRING_LABEL_COLOR);
-    ui->label_3->setFont(GUIUtil::getSubLabelFont());
-
-    ui->label_4->setStyleSheet(STRING_LABEL_COLOR);
-    ui->label_4->setFont(GUIUtil::getSubLabelFont());
-
-    ui->label_7->setStyleSheet(STRING_LABEL_COLOR);
-    ui->label_7->setFont(GUIUtil::getSubLabelFont());
-
-    ui->reuseAddress->setStyleSheet(QString(".QCheckBox{ %1; }").arg(STRING_LABEL_COLOR));
-    ui->reqLabel->setFont(GUIUtil::getSubLabelFont());
-    ui->reqAmount->setFont(GUIUtil::getSubLabelFont());
-    ui->reqMessage->setFont(GUIUtil::getSubLabelFont());
-    ui->receiveButton->setFont(GUIUtil::getSubLabelFont());
-    ui->clearButton->setFont(GUIUtil::getSubLabelFont());
-    ui->recentRequestsView->setFont(GUIUtil::getSubLabelFont());
-    ui->showRequestButton->setFont(GUIUtil::getSubLabelFont());
-    ui->removeRequestButton->setFont(GUIUtil::getSubLabelFont());
-    ui->label_5->setFont(GUIUtil::getSubLabelFont());
-
-    ui->label_6->setFont(GUIUtil::getSubLabelFontBolded());
-}
-
-void ReceiveCoinsDialog::setupHistoryFrame(const PlatformStyle *platformStyle)
-{
-    /** Update the coincontrol frame */
-    ui->frame->setStyleSheet(QString(".QFrame {background-color: %1; border: none;}").arg(platformStyle->WidgetBackGroundColor().name()));
-    /** Create the shadow effects on the frames */
-
-    ui->frame->setGraphicsEffect(GUIUtil::getShadowEffect());
-
-    ui->label_6->setStyleSheet(STRING_LABEL_COLOR);
-
-    contextMenu->setFont(GUIUtil::getSubLabelFont());
-
 }
 
 void ReceiveCoinsDialog::updateDisplayUnit()
@@ -313,7 +251,7 @@ void ReceiveCoinsDialog::copyColumnToClipboard(int column)
     if (!firstIndex.isValid()) {
         return;
     }
-    GUIUtil::setClipboard(model->getRecentRequestsTableModel()->data(firstIndex.model()->index(firstIndex.row(), column), Qt::EditRole).toString());
+    GUIUtil::setClipboard(model->getRecentRequestsTableModel()->data(firstIndex.child(firstIndex.row(), column), Qt::EditRole).toString());
 }
 
 // context menu
@@ -334,7 +272,7 @@ void ReceiveCoinsDialog::copyURI()
     }
 
     const RecentRequestsTableModel * const submodel = model->getRecentRequestsTableModel();
-    const QString uri = GUIUtil::formatNeoxaURI(submodel->entry(sel.row()).recipient);
+    const QString uri = GUIUtil::formatBitcoinURI(submodel->entry(sel.row()).recipient);
     GUIUtil::setClipboard(uri);
 }
 

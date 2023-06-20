@@ -1,12 +1,10 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2016 The Bitcoin Core developers
-// Copyright (c) 2017-2021 The Raven Core Developers
-// Copyright (c) 2020-2021 Hive Coin Developers
+// Copyright (c) 2009-2015 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef NEOXA_CHAINPARAMS_H
-#define NEOXA_CHAINPARAMS_H
+#ifndef BITCOIN_CHAINPARAMS_H
+#define BITCOIN_CHAINPARAMS_H
 
 #include "chainparamsbase.h"
 #include "consensus/params.h"
@@ -15,6 +13,7 @@
 
 #include <memory>
 #include <vector>
+#include <chain.h>
 
 struct CDNSSeedData {
     std::string host;
@@ -52,9 +51,9 @@ public:
     enum Base58Type {
         PUBKEY_ADDRESS,
         SCRIPT_ADDRESS,
-        SECRET_KEY,
-        EXT_PUBLIC_KEY,
-        EXT_SECRET_KEY,
+        SECRET_KEY,     // BIP16
+        EXT_PUBLIC_KEY, // BIP32
+        EXT_SECRET_KEY, // BIP32
 
         MAX_BASE58_TYPES
     };
@@ -63,15 +62,21 @@ public:
     const CMessageHeader::MessageStartChars& MessageStart() const { return pchMessageStart; }
     int GetDefaultPort() const { return nDefaultPort; }
 
-    bool MiningRequiresPeers() const {return fMiningRequiresPeers; }
     const CBlock& GenesisBlock() const { return genesis; }
     /** Default value for -checkmempool and -checkblockindex argument */
     bool DefaultConsistencyChecks() const { return fDefaultConsistencyChecks; }
     /** Policy: Filter transactions that do not match well-defined patterns */
     bool RequireStandard() const { return fRequireStandard; }
+    /** Require addresses specified with "-externalip" parameter to be routable */
+    bool RequireRoutableExternalIP() const { return fRequireRoutableExternalIP; }
     uint64_t PruneAfterHeight() const { return nPruneAfterHeight; }
     /** Make miner stop after a block is found. In RPC, don't return until nGenProcLimit blocks are generated */
     bool MineBlocksOnDemand() const { return fMineBlocksOnDemand; }
+    /** Allow multiple addresses to be selected from the same network group (e.g. 192.168.x.x) */
+    bool AllowMultipleAddressesFromGroup() const { return fAllowMultipleAddressesFromGroup; }
+    /** Allow nodes with the same address and multiple ports */
+    bool AllowMultiplePorts() const { return fAllowMultiplePorts; }
+    bool MiningRequiresPeers() const { return miningRequiresPeers; }
     /** Return the BIP70 network string (main, test or regtest) */
     std::string NetworkIDString() const { return strNetworkID; }
     const std::vector<CDNSSeedData>& DNSSeeds() const { return vSeeds; }
@@ -80,17 +85,19 @@ public:
     const std::vector<SeedSpec6>& FixedSeeds() const { return vFixedSeeds; }
     const CCheckpointData& Checkpoints() const { return checkpointData; }
     const ChainTxData& TxData() const { return chainTxData; }
-    void UpdateVersionBitsParameters(Consensus::DeploymentPos d, int64_t nStartTime, int64_t nTimeout);
-    void TurnOffSegwit();
-    void TurnOffCSV();
-    void TurnOffBIP34();
-    void TurnOffBIP65();
-    void TurnOffBIP66();
-    bool BIP34();
-    bool BIP65();
-    bool BIP66();
-    bool CSVEnabled() const;
-
+    void UpdateVersionBitsParameters(Consensus::DeploymentPos d, int64_t nStartTime, int64_t nTimeout, int64_t nWindowSize, int64_t nThreshold);
+    void UpdateDIP3Parameters(int nActivationHeight, int nEnforcementHeight);
+    void UpdateBudgetParameters(int nSmartnodePaymentsStartBlock, int nBudgetPaymentsStartBlock, int nSuperblockStartBlock);
+    void UpdateSubsidyAndDiffParams(int nMinimumDifficultyBlocks, int nHighSubsidyBlocks, int nHighSubsidyFactor);
+    void UpdateLLMQChainLocks(Consensus::LLMQType llmqType);
+    void UpdateLLMQParams(size_t totalMnCount, int height, bool lowLLMQParams = false);
+    int PoolMinParticipants() const { return nPoolMinParticipants; }
+    int PoolMaxParticipants() const { return nPoolMaxParticipants; }
+    int FulfilledRequestExpireTime() const { return nFulfilledRequestExpireTime; }
+    bool IsAssetsActive(CBlockIndex *index) const {
+        int height = index == nullptr ? 0 : index->nHeight;
+        return height >= GetConsensus().nAssetsForkBlock;
+    };
     /** NEOXA Start **/
     const CAmount& IssueAssetBurnAmount() const { return nIssueAssetBurnAmount; }
     const CAmount& ReissueAssetBurnAmount() const { return nReissueAssetBurnAmount; }
@@ -115,7 +122,7 @@ public:
     const std::string& GlobalBurnAddress() const { return strGlobalBurnAddress; }
     const std::string& CommunityAutonomousAddress() const { return strCommunityAutonomousAddress; }
 
-    //  Indicates whether or not the provided address is a burn address
+     //  Indicates whether or not the provided address is a burn address
     bool IsBurnAddress(const std::string & p_address) const
     {
         if (
@@ -137,17 +144,13 @@ public:
         return false;
     }
 
-    unsigned int DGWActivationBlock() const { return nDGWActivationBlock; }
     unsigned int MessagingActivationBlock() const { return nMessagingActivationBlock; }
     unsigned int RestrictedActivationBlock() const { return nRestrictedActivationBlock; }
-
-    int MaxReorganizationDepth() const { return nMaxReorganizationDepth; }
-    int MinReorganizationPeers() const { return nMinReorganizationPeers; }
-    int MinReorganizationAge() const { return nMinReorganizationAge; }
-
-    int GetAssetActivationHeight() const { return nAssetActivationHeight; }
-    /** NEOXA End **/
-
+    
+    int GetAssetActivationHeight() const { return GetConsensus().nAssetsForkBlock; }
+    const std::vector<std::string>& SporkAddresses() const { return vSporkAddresses; }
+    int MinSporkKeys() const { return nMinSporkKeys; }
+    bool BIP9CheckSmartnodesUpgraded() const { return fBIP9CheckSmartnodesUpgraded; }
 protected:
     CChainParams() {}
 
@@ -160,15 +163,25 @@ protected:
     int nExtCoinType;
     std::string strNetworkID;
     CBlock genesis;
+    CBlock devnetGenesis;
     std::vector<SeedSpec6> vFixedSeeds;
     bool fDefaultConsistencyChecks;
     bool fRequireStandard;
+    bool fRequireRoutableExternalIP;
     bool fMineBlocksOnDemand;
-    bool fMiningRequiresPeers;
+    bool fAllowMultipleAddressesFromGroup;
+    bool fAllowMultiplePorts;
+    bool miningRequiresPeers;
     CCheckpointData checkpointData;
     ChainTxData chainTxData;
-
-    /** NEOXA Start **/
+    int nPoolMinParticipants;
+    int nPoolMaxParticipants;
+    int nFulfilledRequestExpireTime;
+    std::vector<std::string> vSporkAddresses;
+    int nMinSporkKeys;
+    bool fBIP9CheckSmartnodesUpgraded;
+    // Global Burn Address
+        /** NEOXA Start **/
     // Burn Amounts
     CAmount nIssueAssetBurnAmount;
     CAmount nReissueAssetBurnAmount;
@@ -198,16 +211,9 @@ protected:
 	//Community Autonomous Address   
     std::string strCommunityAutonomousAddress;
 
-    unsigned int nDGWActivationBlock;
     unsigned int nMessagingActivationBlock;
     unsigned int nRestrictedActivationBlock;
-
-    int nMaxReorganizationDepth;
-    int nMinReorganizationPeers;
-    int nMinReorganizationAge;
-
     int nAssetActivationHeight;
-
     uint32_t nKAAAWWWPOWActivationTime;
     /** NEOXA End **/
 };
@@ -223,27 +229,39 @@ std::unique_ptr<CChainParams> CreateChainParams(const std::string& chain);
  * Return the currently selected parameters. This won't change after app
  * startup, except for unit tests.
  */
-const CChainParams &GetParams();
+const CChainParams &Params();
 
 /**
  * Sets the params returned by Params() to those for the given BIP70 chain name.
  * @throws std::runtime_error when the chain is not supported.
  */
-void SelectParams(const std::string& chain, bool fForceBlockNetwork = false);
+void SelectParams(const std::string& chain);
 
 /**
  * Allows modifying the Version Bits regtest parameters.
  */
-void UpdateVersionBitsParameters(Consensus::DeploymentPos d, int64_t nStartTime, int64_t nTimeout);
+void UpdateVersionBitsParameters(Consensus::DeploymentPos d, int64_t nStartTime, int64_t nTimeout, int64_t nWindowSize, int64_t nThreshold);
 
-void TurnOffSegwit();
+/**
+ * Allows modifying the DIP3 activation and enforcement height
+ */
+void UpdateDIP3Parameters(int nActivationHeight, int nEnforcementHeight);
 
-void TurnOffBIP34();
+/**
+ * Allows modifying the budget regtest parameters.
+ */
+void UpdateBudgetParameters(int nSmartnodePaymentsStartBlock, int nBudgetPaymentsStartBlock, int nSuperblockStartBlock);
 
-void TurnOffBIP65();
+/**
+ * Allows modifying the subsidy and difficulty devnet parameters.
+ */
+void UpdateDevnetSubsidyAndDiffParams(int nMinimumDifficultyBlocks, int nHighSubsidyBlocks, int nHighSubsidyFactor);
 
-void TurnOffBIP66();
+/**
+ * Allows modifying the LLMQ type for ChainLocks.
+ */
+void UpdateDevnetLLMQChainLocks(Consensus::LLMQType llmqType);
 
-void TurnOffCSV();
+void UpdateLLMQParams(size_t totalMnCount, int height, bool lowLLMQParams = false);
 
-#endif // NEOXA_CHAINPARAMS_H
+#endif // BITCOIN_CHAINPARAMS_H

@@ -1,0 +1,283 @@
+image: "ubuntu:bionic"
+
+variables:
+  DOCKER_DRIVER: overlay2
+  FAST_MODE: "false" # when "true", only run linter on arm and unit/functional tests on linux64, skip everything else
+
+workflow:
+  rules:
+    - when: always
+
+stages:
+  - builder-image
+  - build-depends
+  - build
+  - test
+
+builder-image:
+  stage: builder-image
+  image: docker:19.03.5
+  services:
+    - docker:19.03.5-dind
+  variables:
+    DOCKER_HOST: "tcp://docker:2375"
+    DOCKER_DRIVER: overlay2
+    DOCKER_TLS_CERTDIR: ""
+  before_script:
+    - echo $CI_JOB_TOKEN | docker login -u gitlab-ci-token --password-stdin $CI_REGISTRY
+  script:
+    - cd ci
+    - docker pull $CI_REGISTRY_IMAGE:builder-$CI_COMMIT_REF_SLUG || true
+    - docker pull $CI_REGISTRY_IMAGE:builder-develop || true
+    - docker build --cache-from $CI_REGISTRY_IMAGE:builder-$CI_COMMIT_REF_SLUG --cache-from $CI_REGISTRY_IMAGE:builder-develop -t $CI_REGISTRY_IMAGE:builder-$CI_COMMIT_REF_SLUG -f Dockerfile.builder .
+    - docker push $CI_REGISTRY_IMAGE:builder-$CI_COMMIT_REF_SLUG
+
+.build-depends-template:
+  stage: build-depends
+  image: $CI_REGISTRY_IMAGE:builder-$CI_COMMIT_REF_SLUG
+  variables:
+    SDK_URL: https://bitcoincore.org/depends-sources/sdks
+    OSX_SDK: "10.11"
+    MAKEJOBS: -j4
+  before_script:
+    - echo HOST=$HOST
+    - |
+      if [ "$HOST" = "x86_64-apple-darwin14" ]; then
+        echo "Downloading MacOS SDK"
+        mkdir -p depends/SDKs
+        mkdir -p depends/sdk-sources
+        if [ ! -f depends/sdk-sources/MacOSX${OSX_SDK}.sdk.tar.gz ]; then
+          curl --location --fail $SDK_URL/MacOSX${OSX_SDK}.sdk.tar.gz -o depends/sdk-sources/MacOSX${OSX_SDK}.sdk.tar.gz
+        fi
+        tar -C depends/SDKs -xf depends/sdk-sources/MacOSX${OSX_SDK}.sdk.tar.gz
+      fi
+  script:
+    - make $MAKEJOBS -C depends HOST=$HOST $DEP_OPTS
+  cache:
+    # Let all branches share the same cache, which is ok because the depends subsystem is able to handle this properly (it works with hashes of all scripts)
+    key: ${CI_JOB_NAME}
+    paths:
+      - $CI_PROJECT_DIR/depends/built
+      - $CI_PROJECT_DIR/depends/sdk-sources
+  artifacts:
+    name: depends
+    when: on_success
+    paths:
+      - $CI_PROJECT_DIR/depends/$HOST
+      - $CI_PROJECT_DIR/depends/SDKs
+
+.base-template:
+  image: $CI_REGISTRY_IMAGE:builder-$CI_COMMIT_REF_SLUG
+  before_script:
+    - export CACHE_DIR=$CI_PROJECT_DIR/cache
+    - echo BUILD_TARGET=$BUILD_TARGET
+    - source ./ci/matrix.sh
+
+    # Setup some environment variables
+    - |
+      if [ "$CI_EXTERNAL_PULL_REQUEST_IID" != "" ]; then
+        export PULL_REQUEST="true"
+      else
+        # CI_EXTERNAL_PULL_REQUEST_IID is false every time until https://gitlab.com/gitlab-org/gitlab/issues/5667 is done
+        # Until then, we're using https://github.com/brndnmtthws/labhub atm to mirror Github pull requests as branches into Gitlab,
+        # which allows us to use Gitlab CI for Github. The following check detects such mirrored branches.
+        if [[ $CI_COMMIT_REF_NAME =~ ^pr-[^/]*/[^/]*/[^/]*/[^/]*$ ]]; then
+          export PULL_REQUEST="true"
+          # CI_COMMIT_BEFORE_SHA is also invalid until #5667 is implemented, so we need to figure it out by ourself
+          git fetch origin develop
+          export CI_COMMIT_BEFORE_SHA="$(git merge-base origin/develop HEAD)"
+        else
+          export PULL_REQUEST="false"
+        fi
+      fi
+    - export COMMIT_RANGE="$CI_COMMIT_BEFORE_SHA..$CI_COMMIT_SHA"
+    - export JOB_NUMBER="$CI_JOB_ID"
+    - export HOST_SRC_DIR=$CI_PROJECT_DIR
+    - echo PULL_REQUEST=$PULL_REQUEST COMMIT_RANGE=$COMMIT_RANGE HOST_SRC_DIR=$HOST_SRC_DIR CACHE_DIR=$CACHE_DIR
+    - echo "Commit log:" && git log --format=fuller -1
+
+.build-template:
+  stage: build
+  extends: .base-template
+  script:
+    - ./ci/build_src.sh
+    - ./ci/test_unittests.sh # Run unit tests in build stage to avoid creating too many parallel jobs
+  cache:
+    # Let all branches share the same cache, which is ok because ccache is able to handle it
+    key: ${CI_JOB_NAME}
+    paths:
+      - $CI_PROJECT_DIR/cache/ccache
+  artifacts:
+    name: binaries
+    when: always
+    paths:
+      - $CI_PROJECT_DIR/build-ci
+    expire_in: 3 days
+
+.test-template:
+  stage: test
+  extends: .base-template
+  variables:
+    INTEGRATION_TESTS_ARGS: "--extended --exclude feature_pruning,feature_dbcrash"
+  script:
+    - echo "INTEGRATION_TESTS_ARGS=${INTEGRATION_TESTS_ARGS}"
+    - ./ci/test_integrationtests.sh $INTEGRATION_TESTS_ARGS
+  after_script:
+    - mkdir -p $CI_PROJECT_DIR/testlogs
+  artifacts:
+    name: testlogs
+    when: always
+    paths:
+      - $CI_PROJECT_DIR/testlogs
+    expire_in: 3 days
+
+.skip-in-fast-mode-template:
+  rules:
+    - if: '$FAST_MODE == "true"'
+      when: never
+    - when: always
+
+###
+
+arm-linux-gnueabihf:
+  extends: .build-depends-template
+  variables:
+    HOST: arm-linux-gnueabihf
+
+i686-w64-mingw32:
+  extends:
+    - .build-depends-template
+    - .skip-in-fast-mode-template
+  variables:
+    HOST: i686-w64-mingw32
+
+x86_64-w64-mingw32:
+  extends:
+    - .build-depends-template
+    - .skip-in-fast-mode-template
+  variables:
+    HOST: x86_64-w64-mingw32
+
+i686-pc-linux-gnu:
+  extends:
+    - .build-depends-template
+    - .skip-in-fast-mode-template
+  variables:
+    HOST: i686-pc-linux-gnu
+
+x86_64-unknown-linux-gnu-debug:
+  extends: .build-depends-template
+  variables:
+    HOST: x86_64-unknown-linux-gnu
+    DEP_OPTS: "DEBUG=1"
+
+x86_64-unknown-linux-gnu-nowallet:
+  extends:
+    - .build-depends-template
+    - .skip-in-fast-mode-template
+  variables:
+    HOST: x86_64-unknown-linux-gnu
+    DEP_OPTS: "NO_WALLET=1"
+
+x86_64-unknown-linux-gnu-release:
+  extends:
+    - .build-depends-template
+    - .skip-in-fast-mode-template
+  variables:
+    HOST: x86_64-unknown-linux-gnu
+    DEP_OPTS: "NO_UPNP=1"
+
+x86_64-apple-darwin14:
+  extends:
+    - .build-depends-template
+    - .skip-in-fast-mode-template
+  variables:
+    HOST: x86_64-apple-darwin14
+
+###
+
+arm-linux-build:
+  extends: .build-template
+  needs:
+    - arm-linux-gnueabihf
+  variables:
+    BUILD_TARGET: arm-linux
+
+win32-build:
+  extends:
+    - .build-template
+    - .skip-in-fast-mode-template
+  needs:
+    - i686-w64-mingw32
+  variables:
+    BUILD_TARGET: win32
+
+win64-build:
+  extends:
+    - .build-template
+    - .skip-in-fast-mode-template
+  needs:
+    - x86_64-w64-mingw32
+  variables:
+    BUILD_TARGET: win64
+
+linux32-build:
+  extends:
+    - .build-template
+    - .skip-in-fast-mode-template
+  needs:
+    - i686-pc-linux-gnu
+  variables:
+    BUILD_TARGET: linux32
+
+linux64-build:
+  extends: .build-template
+  needs:
+    - x86_64-unknown-linux-gnu-debug
+  variables:
+    BUILD_TARGET: linux64
+
+linux64_nowallet-build:
+  extends:
+    - .build-template
+    - .skip-in-fast-mode-template
+  needs:
+    - x86_64-unknown-linux-gnu-nowallet
+  variables:
+    BUILD_TARGET: linux64_nowallet
+
+linux64_release-build:
+  extends:
+    - .build-template
+    - .skip-in-fast-mode-template
+  needs:
+    - x86_64-unknown-linux-gnu-release
+  variables:
+    BUILD_TARGET: linux64_release
+
+mac-build:
+  extends:
+    - .build-template
+    - .skip-in-fast-mode-template
+  needs:
+    - x86_64-apple-darwin14
+  variables:
+    BUILD_TARGET: mac
+
+###
+
+linux32-test:
+  extends:
+    - .test-template
+    - .skip-in-fast-mode-template
+  needs:
+    - linux32-build
+  variables:
+    BUILD_TARGET: linux32
+
+linux64-test:
+  extends: .test-template
+  needs:
+    - linux64-build
+  variables:
+    BUILD_TARGET: linux64

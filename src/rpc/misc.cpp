@@ -1,7 +1,7 @@
 // Copyright (c) 2010 Satoshi Nakamoto
-// Copyright (c) 2009-2016 The Bitcoin Core developers
-// Copyright (c) 2017-2019 The Raven Core developers
-// Copyright (c) 2020-2021 The Neoxa Core developers
+// Copyright (c) 2009-2015 The Bitcoin Core developers
+// Copyright (c) 2014-2020 The Dash Core developers
+// Copyright (c) 2020 The Neoxa developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -10,7 +10,6 @@
 #include "clientversion.h"
 #include "core_io.h"
 #include "init.h"
-#include "validation.h"
 #include "httpserver.h"
 #include "net.h"
 #include "netbase.h"
@@ -20,6 +19,7 @@
 #include "txmempool.h"
 #include "util.h"
 #include "utilstrencodings.h"
+#include "validation.h"
 #ifdef ENABLE_WALLET
 #include "wallet/rpcwallet.h"
 #include "wallet/wallet.h"
@@ -27,10 +27,15 @@
 #endif
 #include "warnings.h"
 
+#include "smartnode/smartnode-sync.h"
+#include "spork.h"
+
 #include <stdint.h>
 #ifdef HAVE_MALLOC_INFO
 #include <malloc.h>
 #endif
+
+#include <boost/algorithm/string.hpp>
 
 #include <univalue.h>
 
@@ -55,11 +60,12 @@ UniValue getinfo(const JSONRPCRequest& request)
             "\nDEPRECATED. Returns an object containing various state info.\n"
             "\nResult:\n"
             "{\n"
-            "  \"deprecation-warning\": \"...\" (string) warning that the getinfo command is deprecated and will be removed in 0.16\n"
+            "  \"deprecation-warning\": \"...\" (string) warning that the getinfo command is deprecated and will be removed in a future version\n"
             "  \"version\": xxxxx,           (numeric) the server version\n"
             "  \"protocolversion\": xxxxx,   (numeric) the protocol version\n"
             "  \"walletversion\": xxxxx,     (numeric) the wallet version\n"
-            "  \"balance\": xxxxxxx,         (numeric) the total Neoxa balance of the wallet\n"
+            "  \"balance\": xxxxxxx,         (numeric) the total neoxa balance of the wallet\n"
+            "  \"privatesend_balance\": xxxxxx, (numeric) the PrivateSend balance in " + CURRENCY_UNIT + "\n"
             "  \"blocks\": xxxxxx,           (numeric) the current number of blocks processed in the server\n"
             "  \"timeoffset\": xxxxx,        (numeric) the time offset\n"
             "  \"connections\": xxxxx,       (numeric) the number of connections\n"
@@ -90,14 +96,15 @@ UniValue getinfo(const JSONRPCRequest& request)
     GetProxy(NET_IPV4, proxy);
 
     UniValue obj(UniValue::VOBJ);
-    obj.push_back(Pair("deprecation-warning", "WARNING: getinfo is deprecated and will be fully removed in 0.16."
-        " Projects should transition to using getblockchaininfo, getnetworkinfo, and getwalletinfo before upgrading to 0.16"));
+    obj.push_back(Pair("deprecation-warning", "WARNING: getinfo is deprecated and will be fully removed in a future version."
+        " Projects should transition to using getblockchaininfo, getnetworkinfo, and getwalletinfo."));
     obj.push_back(Pair("version", CLIENT_VERSION));
     obj.push_back(Pair("protocolversion", PROTOCOL_VERSION));
 #ifdef ENABLE_WALLET
     if (pwallet) {
         obj.push_back(Pair("walletversion", pwallet->GetVersion()));
         obj.push_back(Pair("balance",       ValueFromAmount(pwallet->GetBalance())));
+        obj.push_back(Pair("privatesend_balance",       ValueFromAmount(pwallet->GetAnonymizedBalance())));
     }
 #endif
     obj.push_back(Pair("blocks",        (int)chainActive.Height()));
@@ -106,7 +113,7 @@ UniValue getinfo(const JSONRPCRequest& request)
         obj.push_back(Pair("connections",   (int)g_connman->GetNodeCount(CConnman::CONNECTIONS_ALL)));
     obj.push_back(Pair("proxy",         (proxy.IsValid() ? proxy.proxy.ToStringIPPort() : std::string())));
     obj.push_back(Pair("difficulty",    (double)GetDifficulty()));
-    obj.push_back(Pair("testnet", GetParams().NetworkIDString() == CBaseChainParams::TESTNET));
+    obj.push_back(Pair("testnet",       Params().NetworkIDString() == CBaseChainParams::TESTNET));
 #ifdef ENABLE_WALLET
     if (pwallet) {
         obj.push_back(Pair("keypoololdest", pwallet->GetOldestKeyPoolTime()));
@@ -122,6 +129,82 @@ UniValue getinfo(const JSONRPCRequest& request)
     return obj;
 }
 
+UniValue debug(const JSONRPCRequest& request)
+{
+    if (request.fHelp || request.params.size() != 1)
+        throw std::runtime_error(
+            "debug \"category\"\n"
+            "Change debug category on the fly. Specify single category or use '+' to specify many.\n"
+            "The valid debug categories are: " + ListLogCategories() + ".\n"
+            "libevent logging is configured on startup and cannot be modified by this RPC during runtime.\n"
+            "There are also a few meta-categories:\n"
+            " - \"all\", \"1\" and \"\" activate all categories at once;\n"
+            " - \"neoxa\" activates all Neoxa-specific categories at once;\n"
+            " - \"none\" (or \"0\") deactivates all categories at once.\n"
+            "Note: If specified category doesn't match any of the above, no error is thrown.\n"
+            "\nArguments:\n"
+            "1. \"category\"          (string, required) The name of the debug category to turn on.\n"
+            "\nResult:\n"
+            "  result               (string) \"Debug mode: \" followed by the specified category.\n"
+            "\nExamples:\n"
+            + HelpExampleCli("debug", "neoxa")
+            + HelpExampleRpc("debug", "neoxa+net")
+        );
+
+    std::string strMode = request.params[0].get_str();
+    logCategories = BCLog::NONE;
+
+    std::vector<std::string> categories;
+    boost::split(categories, strMode, boost::is_any_of("+"));
+
+    if (std::find(categories.begin(), categories.end(), std::string("0")) == categories.end()) {
+        for (const auto& cat : categories) {
+            uint64_t flag;
+            if (GetLogCategory(&flag, &cat)) {
+                logCategories |= flag;
+            }
+        }
+    }
+
+    return "Debug mode: " + ListActiveLogCategoriesString();
+}
+
+UniValue mnsync(const JSONRPCRequest& request)
+{
+    if (request.fHelp || request.params.size() != 1)
+        throw std::runtime_error(
+            "mnsync [status|next|reset]\n"
+            "Returns the sync status, updates to the next step or resets it entirely.\n"
+        );
+
+    std::string strMode = request.params[0].get_str();
+
+    if(strMode == "status") {
+        UniValue objStatus(UniValue::VOBJ);
+        objStatus.push_back(Pair("AssetID", smartnodeSync.GetAssetID()));
+        objStatus.push_back(Pair("AssetName", smartnodeSync.GetAssetName()));
+        objStatus.push_back(Pair("AssetStartTime", smartnodeSync.GetAssetStartTime()));
+        objStatus.push_back(Pair("Attempt", smartnodeSync.GetAttempt()));
+        objStatus.push_back(Pair("IsBlockchainSynced", smartnodeSync.IsBlockchainSynced()));
+        objStatus.push_back(Pair("IsSynced", smartnodeSync.IsSynced()));
+        objStatus.push_back(Pair("IsFailed", smartnodeSync.IsFailed()));
+        return objStatus;
+    }
+
+    if(strMode == "next")
+    {
+        smartnodeSync.SwitchToNextAsset(*g_connman);
+        return "sync updated to " + smartnodeSync.GetAssetName();
+    }
+
+    if(strMode == "reset")
+    {
+        smartnodeSync.Reset();
+        smartnodeSync.SwitchToNextAsset(*g_connman);
+        return "success";
+    }
+    return "failure";
+}
 
 #ifdef ENABLE_WALLET
 class DescribeAddressVisitor : public boost::static_visitor<UniValue>
@@ -129,7 +212,7 @@ class DescribeAddressVisitor : public boost::static_visitor<UniValue>
 public:
     CWallet * const pwallet;
 
-    explicit DescribeAddressVisitor(CWallet *_pwallet) : pwallet(_pwallet) {}
+    DescribeAddressVisitor(CWallet *_pwallet) : pwallet(_pwallet) {}
 
     UniValue operator()(const CNoDestination &dest) const { return UniValue(UniValue::VOBJ); }
 
@@ -156,9 +239,8 @@ public:
             obj.push_back(Pair("script", GetTxnOutputType(whichType)));
             obj.push_back(Pair("hex", HexStr(subscript.begin(), subscript.end())));
             UniValue a(UniValue::VARR);
-            for (const CTxDestination& addr : addresses) {
-                a.push_back(EncodeDestination(addr));
-            }
+            for (const CTxDestination& addr : addresses)
+                a.push_back(CBitcoinAddress(addr).ToString());
             obj.push_back(Pair("addresses", a));
             if (whichType == TX_MULTISIG)
                 obj.push_back(Pair("sigsrequired", nRequired));
@@ -167,6 +249,82 @@ public:
     }
 };
 #endif
+
+/*
+    Used for updating/reading spork settings on the network
+*/
+UniValue spork(const JSONRPCRequest& request)
+{
+    if (request.params.size() == 1) {
+        // basic mode, show info
+        std:: string strCommand = request.params[0].get_str();
+        if (strCommand == "show") {
+            UniValue ret(UniValue::VOBJ);
+            for (const auto& sporkDef : sporkDefs) {
+                ret.push_back(Pair(sporkDef.name, sporkManager.GetSporkValue(sporkDef.sporkId)));
+            }
+            return ret;
+        } else if(strCommand == "active"){
+            UniValue ret(UniValue::VOBJ);
+            for (const auto& sporkDef : sporkDefs) {
+                ret.push_back(Pair(sporkDef.name, sporkManager.IsSporkActive(sporkDef.sporkId)));
+            }
+            return ret;
+        }
+    }
+
+    if (request.fHelp || request.params.size() != 2) {
+        // default help, for basic mode
+        throw std::runtime_error(
+            "spork \"command\"\n"
+            "\nShows information about current state of sporks\n"
+            "\nArguments:\n"
+            "1. \"command\"                     (string, required) 'show' to show all current spork values, 'active' to show which sporks are active\n"
+            "\nResult:\n"
+            "For 'show':\n"
+            "{\n"
+            "  \"SPORK_NAME\" : spork_value,    (number) The value of the specific spork with the name SPORK_NAME\n"
+            "  ...\n"
+            "}\n"
+            "For 'active':\n"
+            "{\n"
+            "  \"SPORK_NAME\" : true|false,     (boolean) 'true' for time-based sporks if spork is active and 'false' otherwise\n"
+            "  ...\n"
+            "}\n"
+            "\nExamples:\n"
+            + HelpExampleCli("spork", "show")
+            + HelpExampleRpc("spork", "\"show\""));
+    } else {
+        // advanced mode, update spork values
+        SporkId nSporkID = sporkManager.GetSporkIDByName(request.params[0].get_str());
+        if(nSporkID == SPORK_INVALID)
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid spork name");
+
+        if (!g_connman)
+            throw JSONRPCError(RPC_CLIENT_P2P_DISABLED, "Error: Peer-to-peer functionality missing or disabled");
+
+        // SPORK VALUE
+        int64_t nValue = request.params[1].get_int64();
+
+        //broadcast new spork
+        if(sporkManager.UpdateSpork(nSporkID, nValue, *g_connman)){
+            return "success";
+        } else {
+            throw std::runtime_error(
+                "spork \"name\" value\n"
+                "\nUpdate the value of the specific spork. Requires \"-sporkkey\" to be set to sign the message.\n"
+                "\nArguments:\n"
+                "1. \"name\"              (string, required) The name of the spork to update\n"
+                "2. value               (number, required) The new desired value of the spork\n"
+                "\nResult:\n"
+                "  result               (string) \"success\" if spork value was updated or this help otherwise\n"
+                "\nExamples:\n"
+                + HelpExampleCli("spork", "SPORK_2_INSTANTSEND_ENABLED 4070908800")
+                + HelpExampleRpc("spork", "\"SPORK_2_INSTANTSEND_ENABLED\", 4070908800"));
+        }
+    }
+
+}
 
 UniValue validateaddress(const JSONRPCRequest& request)
 {
@@ -184,7 +342,7 @@ UniValue validateaddress(const JSONRPCRequest& request)
             "  \"ismine\" : true|false,        (boolean) If the address is yours or not\n"
             "  \"iswatchonly\" : true|false,   (boolean) If the address is watchonly\n"
             "  \"isscript\" : true|false,      (boolean) If the key is a script\n"
-            "  \"script\" : \"type\"             (string, optional) The output script type. Possible types: nonstandard, pubkey, pubkeyhash, scripthash, multisig, nulldata, witness_v0_keyhash, witness_v0_scripthash\n"
+            "  \"script\" : \"type\"             (string, optional) The output script type. Possible types: nonstandard, pubkey, pubkeyhash, scripthash, multisig, nulldata\n"
             "  \"hex\" : \"hex\",                (string, optional) The redeemscript for the p2sh address\n"
             "  \"addresses\"                   (string, optional) Array of addresses associated with the known redeemscript\n"
             "    [\n"
@@ -197,11 +355,11 @@ UniValue validateaddress(const JSONRPCRequest& request)
             "  \"account\" : \"account\"         (string) DEPRECATED. The account associated with the address, \"\" is the default account\n"
             "  \"timestamp\" : timestamp,        (number, optional) The creation time of the key if available in seconds since epoch (Jan 1 1970 GMT)\n"
             "  \"hdkeypath\" : \"keypath\"       (string, optional) The HD keypath if the key is HD and available\n"
-            "  \"hdmasterkeyid\" : \"<hash160>\" (string, optional) The Hash160 of the HD master pubkey\n"
+            "  \"hdchainid\" : \"<hash>\"        (string, optional) The ID of the HD chain\n"
             "}\n"
             "\nExamples:\n"
-            + HelpExampleCli("validateaddress", "\"1PSSGeFHDnKNxiEyFrD1wcEaHr9hrQDDWc\"")
-            + HelpExampleRpc("validateaddress", "\"1PSSGeFHDnKNxiEyFrD1wcEaHr9hrQDDWc\"")
+            + HelpExampleCli("validateaddress", "\"XwnLY9Tf7Zsef8gMGL2fhWA9ZmMjt4KPwg\"")
+            + HelpExampleRpc("validateaddress", "\"XwnLY9Tf7Zsef8gMGL2fhWA9ZmMjt4KPwg\"")
         );
 
 #ifdef ENABLE_WALLET
@@ -211,158 +369,16 @@ UniValue validateaddress(const JSONRPCRequest& request)
 #else
     LOCK(cs_main);
 #endif
-	
-	
-	//#################################################################
-	//NEOXA START FOR LOOKING FOR BURN ADDRESS -- BEGIN
-	//Just use to looking suitable prefix address.
-	//1 use command 'neoxad -daemon=0', do not use command neoxad -daemon
-	//2 'neoxa-cli validateaddress HSFs8aqGLDbYk242PQiv5oguQL5Tqk5d' in other console window.
-	//In step 1 command window will to calculate the suitable prefix address for burn address.
-	/*
-	const char *base58chars = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-	std::string address_char_1,address_char_2,address_char_3,address_char_4,address_char_5,address_char_6;
-	std::string address_dest;
-	
-	//strIssueAssetBurnAddress = "HXissueAssetXXXXXXXXXXXXXXXXXhhZGt";
-	//strReissueAssetBurnAddress = "HXReissueAssetXXXXXXXXXXXXXXVEFAWu";
-	//strIssueSubAssetBurnAddress = "HXissueSubAssetXXXXXXXXXXXXXWcwhwL";
-	//strIssueUniqueAssetBurnAddress = "HXissueUniqueAssetXXXXXXXXXXWEAe58";
-	//strIssueMsgChannelAssetBurnAddress = "HXissueMsgChanneLAssetXXXXXXSjHvAY";
-	//strIssueQualifierAssetBurnAddress = "HXissueQuaLifierXXXXXXXXXXXXUgEDbC";
-	//strIssueSubQualifierAssetBurnAddress = "HXissueSubQuaLifierXXXXXXXXXVTzvv5";
-	//strIssueRestrictedAssetBurnAddress = "HXissueRestrictedXXXXXXXXXXXXzJZ1q";
-	//strAddNullQualifierTagBurnAddress = "HXaddTagBurnXXXXXXXXXXXXXXXXZQm5ya";
-	//strGlobalBurnAddress = "HXBurnXXXXXXXXXXXXXXXXXXXXXXWUo9FV";
-							 //HSFs8aqGLDbYk242PQiv5oguQL5Tqk5dFg
-							 //HXissueAssetAAAAAAAAAAAAAAAAAhhZGt
-	//neoxa-cli validateaddress HXissueAssetk242PQiv5oguQL5TqhhZGt
-	//std::string address_have 	= "HXissueAssetXXXXXXXXXXXXXXXX";
-	std::string address_success = "";		
-	std::string address_have 	= request.params[0].get_str();
-    int AddressNeedToCalculate 	= 34 - address_have.length();
-	std::cout << "AddressNeedToCalculate: " << AddressNeedToCalculate << " \n";
-	
-	if(AddressNeedToCalculate == 2)					{
-		for (int iiiii = 0; iiiii < 58  && address_success==""; ++iiiii)    {
-			address_char_5 = base58chars[iiiii];
-			for (int iiiiii = 0; iiiiii < 58  && address_success==""; ++iiiiii)    {
-				address_char_6 = base58chars[iiiiii];
 
-				address_dest = address_have + address_char_5 + address_char_6;
-				
-				//To calculate the address is correct.
-				CTxDestination destTEST = DecodeDestination(address_dest.c_str());
-				bool isValidTEST = IsValidDestination(destTEST);
-				if (isValidTEST) {
-					std::cout << "IsValidDestinationString: \n" << address_dest.c_str() << "\n";
-					address_success = address_dest;
-				}
-			}
-			std::cout << address_char_5 << " \n";
-		}
-	}
-	
-	if(AddressNeedToCalculate == 4)					{
-		for (int iii = 0; iii < 58  && address_success==""; ++iii)    {
-			address_char_3 = base58chars[iii];
-			for (int iiii = 0; iiii < 58  && address_success==""; ++iiii)    {
-				address_char_4 = base58chars[iiii];
-				for (int iiiii = 0; iiiii < 58  && address_success==""; ++iiiii)    {
-					address_char_5 = base58chars[iiiii];
-					for (int iiiiii = 0; iiiiii < 58  && address_success==""; ++iiiiii)    {
-						address_char_6 = base58chars[iiiiii];
-
-						address_dest = address_have + address_char_3 + address_char_4 + address_char_5 + address_char_6;
-						
-						//To calculate the address is correct.
-						CTxDestination destTEST = DecodeDestination(address_dest.c_str());
-						bool isValidTEST = IsValidDestination(destTEST);
-						if (isValidTEST) {
-							std::cout << "IsValidDestinationString: \n" << address_dest.c_str() << "\n";
-							address_success = address_dest;
-						}
-					}
-					std::cout <<  address_char_3 << " " << address_char_4 << " " << address_char_5 << " \n";
-				}
-			}
-		}
-	}
-	
-	if(AddressNeedToCalculate == 5)					{
-		for (int ii = 0; ii < 58  && address_success==""; ++ii)    {
-			address_char_2 = base58chars[ii];
-			for (int iii = 0; iii < 58  && address_success==""; ++iii)    {
-				address_char_3 = base58chars[iii];
-				for (int iiii = 0; iiii < 58  && address_success==""; ++iiii)    {
-					address_char_4 = base58chars[iiii];
-					for (int iiiii = 0; iiiii < 58  && address_success==""; ++iiiii)    {
-						address_char_5 = base58chars[iiiii];
-						for (int iiiiii = 0; iiiiii < 58  && address_success==""; ++iiiiii)    {
-							address_char_6 = base58chars[iiiiii];
-
-							address_dest = address_have + address_char_2 + address_char_3 + address_char_4 + address_char_5 + address_char_6;
-							
-							//To calculate the address is correct.
-							CTxDestination destTEST = DecodeDestination(address_dest.c_str());
-							bool isValidTEST = IsValidDestination(destTEST);
-							if (isValidTEST) {
-								std::cout << "IsValidDestinationString: \n" << address_dest.c_str() << "\n";
-								address_success = address_dest;
-							}
-						}
-						std::cout << address_char_2 << " " << address_char_3 << " " << address_char_4 << " " << address_char_5 << " \n";
-					}
-				}
-			}
-		}
-		
-	}
-	
-	
-	if(AddressNeedToCalculate == 6)					{
-		for (int i = 0; i < 58  && address_success==""; ++i)    {
-			address_char_1 = base58chars[i];
-			for (int ii = 0; ii < 58  && address_success==""; ++ii)    {
-				address_char_2 = base58chars[ii];
-				for (int iii = 0; iii < 58  && address_success==""; ++iii)    {
-					address_char_3 = base58chars[iii];
-					for (int iiii = 0; iiii < 58  && address_success==""; ++iiii)    {
-						address_char_4 = base58chars[iiii];
-						for (int iiiii = 0; iiiii < 58  && address_success==""; ++iiiii)    {
-							address_char_5 = base58chars[iiiii];
-							for (int iiiiii = 0; iiiiii < 58  && address_success==""; ++iiiiii)    {
-								address_char_6 = base58chars[iiiiii];
-
-								address_dest = address_have + address_char_1 + address_char_2 + address_char_3 + address_char_4 + address_char_5 + address_char_6;
-								
-								//To calculate the address is correct.
-								CTxDestination destTEST = DecodeDestination(address_dest.c_str());
-								bool isValidTEST = IsValidDestination(destTEST);
-								if (isValidTEST) {
-									std::cout << "IsValidDestinationString: \n" << address_dest.c_str() << "\n";
-									address_success = address_dest;
-								}
-							}
-							std::cout << address_char_1 << " " << address_char_2 << " " << address_char_3 << " " << address_char_4 << " " << address_char_5 << " \n";
-						}
-					}
-				}
-			}
-		}
-	}
-	//NEOXA START FOR LOOKING FOR BURN ADDRESS -- END
-	*/
-	//#################################################################
-
-    CTxDestination dest = DecodeDestination(request.params[0].get_str());
-    bool isValid = IsValidDestination(dest);
+    CBitcoinAddress address(request.params[0].get_str());
+    bool isValid = address.IsValid();
 
     UniValue ret(UniValue::VOBJ);
     ret.push_back(Pair("isvalid", isValid));
     if (isValid)
     {
-        std::string currentAddress = EncodeDestination(dest);
+        CTxDestination dest = address.Get();
+        std::string currentAddress = address.ToString();
         ret.push_back(Pair("address", currentAddress));
 
         CScript scriptPubKey = GetScriptForDestination(dest);
@@ -377,19 +393,21 @@ UniValue validateaddress(const JSONRPCRequest& request)
         if (pwallet && pwallet->mapAddressBook.count(dest)) {
             ret.push_back(Pair("account", pwallet->mapAddressBook[dest].name));
         }
+        CKeyID keyID;
         if (pwallet) {
             const auto& meta = pwallet->mapKeyMetadata;
-            const CKeyID *keyID = boost::get<CKeyID>(&dest);
-            auto it = keyID ? meta.find(*keyID) : meta.end();
+            auto it = address.GetKeyID(keyID) ? meta.find(keyID) : meta.end();
             if (it == meta.end()) {
                 it = meta.find(CScriptID(scriptPubKey));
             }
             if (it != meta.end()) {
                 ret.push_back(Pair("timestamp", it->second.nCreateTime));
-                if (!it->second.hdKeypath.empty()) {
-                    ret.push_back(Pair("hdkeypath", it->second.hdKeypath));
-                    ret.push_back(Pair("hdseedid", it->second.hd_seed_id.GetHex()));
-                }
+            }
+
+            CHDChain hdChainCurrent;
+            if (!keyID.IsNull() && pwallet->mapHdPubKeys.count(keyID) && pwallet->GetHDChain(hdChainCurrent)) {
+                ret.push_back(Pair("hdkeypath", pwallet->mapHdPubKeys[keyID].GetKeyPath()));
+                ret.push_back(Pair("hdchainid", hdChainCurrent.GetID().GetHex()));
             }
         }
 #endif
@@ -424,15 +442,16 @@ CScript _createmultisig_redeemScript(CWallet * const pwallet, const UniValue& pa
         const std::string& ks = keys[i].get_str();
 #ifdef ENABLE_WALLET
         // Case 1: Neoxa address and we have full public key:
-        CTxDestination dest = DecodeDestination(ks);
-        if (pwallet && IsValidDestination(dest)) {
-            const CKeyID *keyID = boost::get<CKeyID>(&dest);
-            if (!keyID) {
-                throw std::runtime_error(strprintf("%s does not refer to a key", ks));
-            }
+        CBitcoinAddress address(ks);
+        if (pwallet && address.IsValid()) {
+            CKeyID keyID;
+            if (!address.GetKeyID(keyID))
+                throw std::runtime_error(
+                    strprintf("%s does not refer to a key",ks));
             CPubKey vchPubKey;
-            if (!pwallet->GetPubKey(*keyID, vchPubKey)) {
-                throw std::runtime_error(strprintf("no full public key for address %s", ks));
+            if (!pwallet->GetPubKey(keyID, vchPubKey)) {
+                throw std::runtime_error(
+                    strprintf("no full public key for address %s",ks));
             }
             if (!vchPubKey.IsFullyValid())
                 throw std::runtime_error(" Invalid public key: "+ks);
@@ -493,9 +512,9 @@ UniValue createmultisig(const JSONRPCRequest& request)
 
             "\nExamples:\n"
             "\nCreate a multisig address from 2 addresses\n"
-            + HelpExampleCli("createmultisig", "2 \"[\\\"16sSauSf5pF2UkUwvKGq4qjNRzBZYqgEL5\\\",\\\"171sgjn4YtPu27adkKGrdDwzRTxnRkBfKV\\\"]\"") +
+            + HelpExampleCli("createmultisig", "2 \"[\\\"Xt4qk9uKvQYAonVGSZNXqxeDmtjaEWgfrs\\\",\\\"XoSoWQkpgLpppPoyyzbUFh1fq2RBvW6UK1\\\"]\"") +
             "\nAs a json rpc call\n"
-            + HelpExampleRpc("createmultisig", "2, \"[\\\"16sSauSf5pF2UkUwvKGq4qjNRzBZYqgEL5\\\",\\\"171sgjn4YtPu27adkKGrdDwzRTxnRkBfKV\\\"]\"")
+            + HelpExampleRpc("createmultisig", "2, \"[\\\"Xt4qk9uKvQYAonVGSZNXqxeDmtjaEWgfrs\\\",\\\"XoSoWQkpgLpppPoyyzbUFh1fq2RBvW6UK1\\\"]\"")
         ;
         throw std::runtime_error(msg);
     }
@@ -503,9 +522,10 @@ UniValue createmultisig(const JSONRPCRequest& request)
     // Construct using pay-to-script-hash:
     CScript inner = _createmultisig_redeemScript(pwallet, request.params);
     CScriptID innerID(inner);
+    CBitcoinAddress address(innerID);
 
     UniValue result(UniValue::VOBJ);
-    result.push_back(Pair("address", EncodeDestination(innerID)));
+    result.push_back(Pair("address", address.ToString()));
     result.push_back(Pair("redeemScript", HexStr(inner.begin(), inner.end())));
 
     return result;
@@ -527,11 +547,11 @@ UniValue verifymessage(const JSONRPCRequest& request)
             "\nUnlock the wallet for 30 seconds\n"
             + HelpExampleCli("walletpassphrase", "\"mypassphrase\" 30") +
             "\nCreate the signature\n"
-            + HelpExampleCli("signmessage", "\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XX\" \"my message\"") +
+            + HelpExampleCli("signmessage", "\"XwnLY9Tf7Zsef8gMGL2fhWA9ZmMjt4KPwG\" \"my message\"") +
             "\nVerify the signature\n"
-            + HelpExampleCli("verifymessage", "\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XX\" \"signature\" \"my message\"") +
+            + HelpExampleCli("verifymessage", "\"XwnLY9Tf7Zsef8gMGL2fhWA9ZmMjt4KPwG\" \"signature\" \"my message\"") +
             "\nAs json rpc\n"
-            + HelpExampleRpc("verifymessage", "\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XX\", \"signature\", \"my message\"")
+            + HelpExampleRpc("verifymessage", "\"XwnLY9Tf7Zsef8gMGL2fhWA9ZmMjt4KPwG\", \"signature\", \"my message\"")
         );
 
     LOCK(cs_main);
@@ -540,15 +560,13 @@ UniValue verifymessage(const JSONRPCRequest& request)
     std::string strSign     = request.params[1].get_str();
     std::string strMessage  = request.params[2].get_str();
 
-    CTxDestination destination = DecodeDestination(strAddress);
-    if (!IsValidDestination(destination)) {
+    CBitcoinAddress addr(strAddress);
+    if (!addr.IsValid())
         throw JSONRPCError(RPC_TYPE_ERROR, "Invalid address");
-    }
 
-    const CKeyID *keyID = boost::get<CKeyID>(&destination);
-    if (!keyID) {
+    CKeyID keyID;
+    if (!addr.GetKeyID(keyID))
         throw JSONRPCError(RPC_TYPE_ERROR, "Address does not refer to key");
-    }
 
     bool fInvalid = false;
     std::vector<unsigned char> vchSig = DecodeBase64(strSign.c_str(), &fInvalid);
@@ -564,7 +582,7 @@ UniValue verifymessage(const JSONRPCRequest& request)
     if (!pubkey.RecoverCompact(ss.GetHash(), vchSig))
         return false;
 
-    return (pubkey.GetID() == *keyID);
+    return (pubkey.GetID() == keyID);
 }
 
 UniValue signmessagewithprivkey(const JSONRPCRequest& request)
@@ -582,7 +600,7 @@ UniValue signmessagewithprivkey(const JSONRPCRequest& request)
             "\nCreate the signature\n"
             + HelpExampleCli("signmessagewithprivkey", "\"privkey\" \"my message\"") +
             "\nVerify the signature\n"
-            + HelpExampleCli("verifymessage", "\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XX\" \"signature\" \"my message\"") +
+            + HelpExampleCli("verifymessage", "\"XwnLY9Tf7Zsef8gMGL2fhWA9ZmMjt4KPwG\" \"signature\" \"my message\"") +
             "\nAs json rpc\n"
             + HelpExampleRpc("signmessagewithprivkey", "\"privkey\", \"my message\"")
         );
@@ -590,7 +608,7 @@ UniValue signmessagewithprivkey(const JSONRPCRequest& request)
     std::string strPrivkey = request.params[0].get_str();
     std::string strMessage = request.params[1].get_str();
 
-    CNeoxaSecret vchSecret;
+    CBitcoinSecret vchSecret;
     bool fGood = vchSecret.SetString(strPrivkey);
     if (!fGood)
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid private key");
@@ -606,7 +624,7 @@ UniValue signmessagewithprivkey(const JSONRPCRequest& request)
     if (!key.SignCompact(ss.GetHash(), vchSig))
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Sign failed");
 
-    return EncodeBase64(vchSig.data(), vchSig.size());
+    return EncodeBase64(&vchSig[0], vchSig.size());
 }
 
 UniValue setmocktime(const JSONRPCRequest& request)
@@ -620,7 +638,7 @@ UniValue setmocktime(const JSONRPCRequest& request)
             "   Pass 0 to go back to using the system time."
         );
 
-    if (!GetParams().MineBlocksOnDemand())
+    if (!Params().MineBlocksOnDemand())
         throw std::runtime_error("setmocktime for regression testing (-regtest mode) only");
 
     // For now, don't change mocktime if we're in the middle of validation, as
@@ -636,171 +654,12 @@ UniValue setmocktime(const JSONRPCRequest& request)
     return NullUniValue;
 }
 
-static UniValue RPCLockedMemoryInfo()
-{
-    LockedPool::Stats stats = LockedPoolManager::Instance().stats();
-    UniValue obj(UniValue::VOBJ);
-    obj.push_back(Pair("used", uint64_t(stats.used)));
-    obj.push_back(Pair("free", uint64_t(stats.free)));
-    obj.push_back(Pair("total", uint64_t(stats.total)));
-    obj.push_back(Pair("locked", uint64_t(stats.locked)));
-    obj.push_back(Pair("chunks_used", uint64_t(stats.chunks_used)));
-    obj.push_back(Pair("chunks_free", uint64_t(stats.chunks_free)));
-    return obj;
-}
-
-#ifdef HAVE_MALLOC_INFO
-static std::string RPCMallocInfo()
-{
-    char *ptr = nullptr;
-    size_t size = 0;
-    FILE *f = open_memstream(&ptr, &size);
-    if (f) {
-        malloc_info(0, f);
-        fclose(f);
-        if (ptr) {
-            std::string rv(ptr, size);
-            free(ptr);
-            return rv;
-        }
-    }
-    return "";
-}
-#endif
-
-UniValue getmemoryinfo(const JSONRPCRequest& request)
-{
-    /* Please, avoid using the word "pool" here in the RPC interface or help,
-     * as users will undoubtedly confuse it with the other "memory pool"
-     */
-    if (request.fHelp || request.params.size() > 1)
-        throw std::runtime_error(
-            "getmemoryinfo (\"mode\")\n"
-            "Returns an object containing information about memory usage.\n"
-            "Arguments:\n"
-            "1. \"mode\" determines what kind of information is returned. This argument is optional, the default mode is \"stats\".\n"
-            "  - \"stats\" returns general statistics about memory usage in the daemon.\n"
-            "  - \"mallocinfo\" returns an XML string describing low-level heap state (only available if compiled with glibc 2.10+).\n"
-            "\nResult (mode \"stats\"):\n"
-            "{\n"
-            "  \"locked\": {               (json object) Information about locked memory manager\n"
-            "    \"used\": xxxxx,          (numeric) Number of bytes used\n"
-            "    \"free\": xxxxx,          (numeric) Number of bytes available in current arenas\n"
-            "    \"total\": xxxxxxx,       (numeric) Total number of bytes managed\n"
-            "    \"locked\": xxxxxx,       (numeric) Amount of bytes that succeeded locking. If this number is smaller than total, locking pages failed at some point and key data could be swapped to disk.\n"
-            "    \"chunks_used\": xxxxx,   (numeric) Number allocated chunks\n"
-            "    \"chunks_free\": xxxxx,   (numeric) Number unused chunks\n"
-            "  }\n"
-            "}\n"
-            "\nResult (mode \"mallocinfo\"):\n"
-            "\"<malloc version=\"1\">...\"\n"
-            "\nExamples:\n"
-            + HelpExampleCli("getmemoryinfo", "")
-            + HelpExampleRpc("getmemoryinfo", "")
-        );
-
-    std::string mode = request.params[0].isNull() ? "stats" : request.params[0].get_str();
-    if (mode == "stats") {
-        UniValue obj(UniValue::VOBJ);
-        obj.push_back(Pair("locked", RPCLockedMemoryInfo()));
-        return obj;
-    } else if (mode == "mallocinfo") {
-#ifdef HAVE_MALLOC_INFO
-        return RPCMallocInfo();
-#else
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "mallocinfo is only available when compiled with glibc 2.10+");
-#endif
-    } else {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "unknown mode " + mode);
-    }
-}
-
-uint32_t getCategoryMask(UniValue cats) {
-    cats = cats.get_array();
-    uint32_t mask = 0;
-    for (unsigned int i = 0; i < cats.size(); ++i) {
-        uint32_t flag = 0;
-        std::string cat = cats[i].get_str();
-        if (!GetLogCategory(&flag, &cat)) {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "unknown logging category " + cat);
-        }
-        mask |= flag;
-    }
-    return mask;
-}
-
-UniValue logging(const JSONRPCRequest& request)
-{
-    if (request.fHelp || request.params.size() > 2) {
-        throw std::runtime_error(
-            "logging [include,...] <exclude>\n"
-            "Gets and sets the logging configuration.\n"
-            "When called without an argument, returns the list of categories that are currently being debug logged.\n"
-            "When called with arguments, adds or removes categories from debug logging.\n"
-            "The valid logging categories are: " + ListLogCategories() + "\n"
-            "libevent logging is configured on startup and cannot be modified by this RPC during runtime."
-            "Arguments:\n"
-            "1. \"include\" (array of strings) add debug logging for these categories.\n"
-            "2. \"exclude\" (array of strings) remove debug logging for these categories.\n"
-            "\nResult: <categories>  (string): a list of the logging categories that are active.\n"
-            "\nExamples:\n"
-            + HelpExampleCli("logging", "\"[\\\"all\\\"]\" \"[\\\"http\\\"]\"")
-            + HelpExampleRpc("logging", "[\"all\"], \"[libevent]\"")
-        );
-    }
-
-    uint32_t originalLogCategories = logCategories;
-    if (request.params[0].isArray()) {
-        logCategories |= getCategoryMask(request.params[0]);
-    }
-
-    if (request.params[1].isArray()) {
-        logCategories &= ~getCategoryMask(request.params[1]);
-    }
-
-    // Update libevent logging if BCLog::LIBEVENT has changed.
-    // If the library version doesn't allow it, UpdateHTTPServerLogging() returns false,
-    // in which case we should clear the BCLog::LIBEVENT flag.
-    // Throw an error if the user has explicitly asked to change only the libevent
-    // flag and it failed.
-    uint32_t changedLogCategories = originalLogCategories ^ logCategories;
-    if (changedLogCategories & BCLog::LIBEVENT) {
-        if (!UpdateHTTPServerLogging(logCategories & BCLog::LIBEVENT)) {
-            logCategories &= ~BCLog::LIBEVENT;
-            if (changedLogCategories == BCLog::LIBEVENT) {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "libevent logging cannot be updated when using libevent before v2.1.1.");
-            }
-        }
-    }
-
-    UniValue result(UniValue::VOBJ);
-    std::vector<CLogCategoryActive> vLogCatActive = ListActiveLogCategories();
-    for (const auto& logCatActive : vLogCatActive) {
-        result.pushKV(logCatActive.category, logCatActive.active);
-    }
-
-    return result;
-}
-
-UniValue echo(const JSONRPCRequest& request)
-{
-    if (request.fHelp)
-        throw std::runtime_error(
-            "echo|echojson \"message\" ...\n"
-            "\nSimply echo back the input arguments. This command is for testing.\n"
-            "\nThe difference between echo and echojson is that echojson has argument conversion enabled in the client-side table in"
-            "neoxa-cli and the GUI. There is no server-side difference."
-        );
-
-    return request.params;
-}
-
 bool getAddressFromIndex(const int &type, const uint160 &hash, std::string &address)
 {
     if (type == 2) {
-        address = CNeoxaAddress(CScriptID(hash)).ToString();
+        address = CBitcoinAddress(CScriptID(hash)).ToString();
     } else if (type == 1) {
-        address = CNeoxaAddress(CKeyID(hash)).ToString();
+        address = CBitcoinAddress(CKeyID(hash)).ToString();
     } else {
         return false;
     }
@@ -810,7 +669,7 @@ bool getAddressFromIndex(const int &type, const uint160 &hash, std::string &addr
 bool getAddressesFromParams(const UniValue& params, std::vector<std::pair<uint160, int> > &addresses)
 {
     if (params[0].isStr()) {
-        CNeoxaAddress address(params[0].get_str());
+        CBitcoinAddress address(params[0].get_str());
         uint160 hashBytes;
         int type = 0;
         if (!address.GetIndexKey(hashBytes, type)) {
@@ -828,7 +687,7 @@ bool getAddressesFromParams(const UniValue& params, std::vector<std::pair<uint16
 
         for (std::vector<UniValue>::iterator it = values.begin(); it != values.end(); ++it) {
 
-            CNeoxaAddress address(it->get_str());
+            CBitcoinAddress address(it->get_str());
             uint160 hashBytes;
             int type = 0;
             if (!address.GetIndexKey(hashBytes, type)) {
@@ -855,7 +714,7 @@ bool timestampSort(std::pair<CMempoolAddressDeltaKey, CMempoolAddressDelta> a,
 
 UniValue getaddressmempool(const JSONRPCRequest& request)
 {
-    if (request.fHelp || request.params.size() > 2)
+    if (request.fHelp || request.params.size() != 1)
         throw std::runtime_error(
             "getaddressmempool\n"
             "\nReturns all mempool deltas for an address (requires addressindex to be enabled).\n"
@@ -866,26 +725,22 @@ UniValue getaddressmempool(const JSONRPCRequest& request)
             "      \"address\"  (string) The base58check encoded address\n"
             "      ,...\n"
             "    ]\n"
-            "},\n"
-            "\"includeAssets\" (boolean, optional, default false)  If true this will return an expanded result which includes asset deltas\n"
+            "}\n"
             "\nResult:\n"
             "[\n"
             "  {\n"
             "    \"address\"  (string) The base58check encoded address\n"
-            "    \"assetName\"  (string) The name of the associated asset (NEOX for Neoxa)\n"
             "    \"txid\"  (string) The related txid\n"
             "    \"index\"  (number) The related input or output index\n"
-            "    \"satoshis\"  (number) The difference of satoshis\n"
+            "    \"satoshis\"  (number) The difference of duffs\n"
             "    \"timestamp\"  (number) The time the transaction entered the mempool (seconds)\n"
             "    \"prevtxid\"  (string) The previous txid (if spending)\n"
             "    \"prevout\"  (string) The previous transaction output index (if spending)\n"
             "  }\n"
             "]\n"
             "\nExamples:\n"
-            + HelpExampleCli("getaddressmempool", "'{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"]}'")
-            + HelpExampleRpc("getaddressmempool", "{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"]}")
-            + HelpExampleCli("getaddressmempool", "'{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"]}', true")
-            + HelpExampleRpc("getaddressmempool", "{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"]}, true")
+            + HelpExampleCli("getaddressmempool", "'{\"addresses\": [\"XwnLY9Tf7Zsef8gMGL2fhWA9ZmMjt4KPwg\"]}'")
+            + HelpExampleRpc("getaddressmempool", "{\"addresses\": [\"XwnLY9Tf7Zsef8gMGL2fhWA9ZmMjt4KPwg\"]}")
         );
 
     std::vector<std::pair<uint160, int> > addresses;
@@ -894,25 +749,10 @@ UniValue getaddressmempool(const JSONRPCRequest& request)
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address");
     }
 
-    bool includeAssets = false;
-    if (request.params.size() > 1) {
-        includeAssets = request.params[1].get_bool();
-    }
-
-    if (includeAssets)
-        if (!AreAssetsDeployed())
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Assets aren't active.  includeAssets can't be true.");
-
     std::vector<std::pair<CMempoolAddressDeltaKey, CMempoolAddressDelta> > indexes;
 
-    if (includeAssets) {
-        if (!mempool.getAddressIndex(addresses, indexes)) {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "No information available for address");
-        }
-    } else {
-        if (!mempool.getAddressIndex(addresses, NEOX, indexes)) {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "No information available for address");
-        }
+    if (!mempool.getAddressIndex(addresses, indexes)) {
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "No information available for address");
     }
 
     std::sort(indexes.begin(), indexes.end(), timestampSort);
@@ -929,7 +769,6 @@ UniValue getaddressmempool(const JSONRPCRequest& request)
 
         UniValue delta(UniValue::VOBJ);
         delta.push_back(Pair("address", address));
-        delta.push_back(Pair("assetName", it->first.asset));
         delta.push_back(Pair("txid", it->first.txhash.GetHex()));
         delta.push_back(Pair("index", (int)it->first.index));
         delta.push_back(Pair("satoshis", it->second.amount));
@@ -956,43 +795,23 @@ UniValue getaddressutxos(const JSONRPCRequest& request)
             "    [\n"
             "      \"address\"  (string) The base58check encoded address\n"
             "      ,...\n"
-            "    ],\n"
-            "  \"chainInfo\",  (boolean, optional, default false) Include chain info with results\n"
-            "  \"assetName\"   (string, optional) Get UTXOs for a particular asset instead of NEOX ('*' for all assets).\n"
+            "    ]\n"
             "}\n"
-            "\nResult\n"
+            "\nResult:\n"
             "[\n"
             "  {\n"
             "    \"address\"  (string) The address base58check encoded\n"
-            "    \"assetName\" (string) The asset associated with the UTXOs (NEOX for Neoxa)\n"
             "    \"txid\"  (string) The output txid\n"
-            "    \"height\"  (number) The block height\n"
             "    \"outputIndex\"  (number) The output index\n"
-            "    \"script\"  (strin) The script hex encoded\n"
-            "    \"satoshis\"  (number) The number of satoshis of the output\n"
+            "    \"script\"  (string) The script hex encoded\n"
+            "    \"satoshis\"  (number) The number of duffs of the output\n"
+            "    \"height\"  (number) The block height\n"
             "  }\n"
             "]\n"
             "\nExamples:\n"
-            + HelpExampleCli("getaddressutxos", "'{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"]}'")
-            + HelpExampleRpc("getaddressutxos", "{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"]}")
-            + HelpExampleCli("getaddressutxos", "'{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"],\"assetName\":\"MY_ASSET\"}'")
-            + HelpExampleRpc("getaddressutxos", "{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"],\"assetName\":\"MY_ASSET\"}")
-            );
-
-    bool includeChainInfo = false;
-    std::string assetName = NEOX;
-    if (request.params[0].isObject()) {
-        UniValue chainInfo = find_value(request.params[0].get_obj(), "chainInfo");
-        if (chainInfo.isBool()) {
-            includeChainInfo = chainInfo.get_bool();
-        }
-        UniValue assetNameParam = find_value(request.params[0].get_obj(), "assetName");
-        if (assetNameParam.isStr()) {
-            if (!AreAssetsDeployed())
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "Assets aren't active.  assetName can't be specified.");
-            assetName = assetNameParam.get_str();
-        }
-    }
+            + HelpExampleCli("getaddressutxos", "'{\"addresses\": [\"XwnLY9Tf7Zsef8gMGL2fhWA9ZmMjt4KPwg\"]}'")
+            + HelpExampleRpc("getaddressutxos", "{\"addresses\": [\"XwnLY9Tf7Zsef8gMGL2fhWA9ZmMjt4KPwg\"]}")
+        );
 
     std::vector<std::pair<uint160, int> > addresses;
 
@@ -1003,20 +822,14 @@ UniValue getaddressutxos(const JSONRPCRequest& request)
     std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> > unspentOutputs;
 
     for (std::vector<std::pair<uint160, int> >::iterator it = addresses.begin(); it != addresses.end(); it++) {
-        if (assetName == "*") {
-            if (!GetAddressUnspent((*it).first, (*it).second, unspentOutputs)) {
-                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "No information available for address");
-            }
-        } else {
-            if (!GetAddressUnspent((*it).first, (*it).second, assetName, unspentOutputs)) {
-                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "No information available for address");
-            }
+        if (!GetAddressUnspent((*it).first, (*it).second, unspentOutputs)) {
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "No information available for address");
         }
     }
 
     std::sort(unspentOutputs.begin(), unspentOutputs.end(), heightSort);
 
-    UniValue utxos(UniValue::VARR);
+    UniValue result(UniValue::VARR);
 
     for (std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> >::const_iterator it=unspentOutputs.begin(); it!=unspentOutputs.end(); it++) {
         UniValue output(UniValue::VOBJ);
@@ -1025,35 +838,16 @@ UniValue getaddressutxos(const JSONRPCRequest& request)
             throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Unknown address type");
         }
 
-        std::string assetNameOut = "NEOX";
-        if (assetName != "NEOX") {
-            CAmount _amount;
-            if (!GetAssetInfoFromScript(it->second.script, assetNameOut, _amount)) {
-                throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't decode asset script");
-            }
-        }
-
         output.push_back(Pair("address", address));
-        output.push_back(Pair("assetName", assetNameOut));
         output.push_back(Pair("txid", it->first.txhash.GetHex()));
         output.push_back(Pair("outputIndex", (int)it->first.index));
         output.push_back(Pair("script", HexStr(it->second.script.begin(), it->second.script.end())));
         output.push_back(Pair("satoshis", it->second.satoshis));
         output.push_back(Pair("height", it->second.blockHeight));
-        utxos.push_back(output);
+        result.push_back(output);
     }
 
-    if (includeChainInfo) {
-        UniValue result(UniValue::VOBJ);
-        result.push_back(Pair("utxos", utxos));
-
-        LOCK(cs_main);
-        result.push_back(Pair("hash", chainActive.Tip()->GetBlockHash().GetHex()));
-        result.push_back(Pair("height", (int)chainActive.Height()));
-        return result;
-    } else {
-        return utxos;
-    }
+    return result;
 }
 
 UniValue getaddressdeltas(const JSONRPCRequest& request)
@@ -1071,44 +865,26 @@ UniValue getaddressdeltas(const JSONRPCRequest& request)
             "    ]\n"
             "  \"start\" (number) The start block height\n"
             "  \"end\" (number) The end block height\n"
-            "  \"chainInfo\" (boolean) Include chain info in results, only applies if start and end specified\n"
-            "  \"assetName\"   (string, optional) Get deltas for a particular asset instead of NEOX.\n"
             "}\n"
             "\nResult:\n"
             "[\n"
             "  {\n"
-            "    \"assetName\"  (string) The asset associated with the deltas (NEOX for Neoxa)\n"
-            "    \"satoshis\"  (number) The difference of satoshis\n"
+            "    \"satoshis\"  (number) The difference of duffs\n"
             "    \"txid\"  (string) The related txid\n"
             "    \"index\"  (number) The related input or output index\n"
+            "    \"blockindex\"  (number) The related block index\n"
             "    \"height\"  (number) The block height\n"
             "    \"address\"  (string) The base58check encoded address\n"
             "  }\n"
             "]\n"
             "\nExamples:\n"
-            + HelpExampleCli("getaddressdeltas", "'{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"]}'")
-            + HelpExampleRpc("getaddressdeltas", "{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"]}")
-            + HelpExampleCli("getaddressdeltas", "'{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"],\"assetName\":\"MY_ASSET\"}'")
-            + HelpExampleRpc("getaddressdeltas", "{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"],\"assetName\":\"MY_ASSET\"}")
+            + HelpExampleCli("getaddressdeltas", "'{\"addresses\": [\"XwnLY9Tf7Zsef8gMGL2fhWA9ZmMjt4KPwg\"]}'")
+            + HelpExampleRpc("getaddressdeltas", "{\"addresses\": [\"XwnLY9Tf7Zsef8gMGL2fhWA9ZmMjt4KPwg\"]}")
         );
 
 
     UniValue startValue = find_value(request.params[0].get_obj(), "start");
     UniValue endValue = find_value(request.params[0].get_obj(), "end");
-
-    UniValue chainInfo = find_value(request.params[0].get_obj(), "chainInfo");
-    bool includeChainInfo = false;
-    if (chainInfo.isBool()) {
-        includeChainInfo = chainInfo.get_bool();
-    }
-
-    std::string assetName = NEOX;
-    UniValue assetNameParam = find_value(request.params[0].get_obj(), "assetName");
-    if (assetNameParam.isStr()) {
-        if (!AreAssetsDeployed())
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Assets aren't active.  assetName can't be specified.");
-        assetName = assetNameParam.get_str();
-    }
 
     int start = 0;
     int end = 0;
@@ -1116,9 +892,6 @@ UniValue getaddressdeltas(const JSONRPCRequest& request)
     if (startValue.isNum() && endValue.isNum()) {
         start = startValue.get_int();
         end = endValue.get_int();
-        if (start <= 0 || end <= 0) {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Start and end is expected to be greater than zero");
-        }
         if (end < start) {
             throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "End value is expected to be greater than start");
         }
@@ -1134,17 +907,17 @@ UniValue getaddressdeltas(const JSONRPCRequest& request)
 
     for (std::vector<std::pair<uint160, int> >::iterator it = addresses.begin(); it != addresses.end(); it++) {
         if (start > 0 && end > 0) {
-            if (!GetAddressIndex((*it).first, (*it).second, assetName, addressIndex, start, end)) {
+            if (!GetAddressIndex((*it).first, (*it).second, addressIndex, start, end)) {
                 throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "No information available for address");
             }
         } else {
-            if (!GetAddressIndex((*it).first, (*it).second, assetName, addressIndex)) {
+            if (!GetAddressIndex((*it).first, (*it).second, addressIndex)) {
                 throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "No information available for address");
             }
         }
     }
 
-    UniValue deltas(UniValue::VARR);
+    UniValue result(UniValue::VARR);
 
     for (std::vector<std::pair<CAddressIndexKey, CAmount> >::const_iterator it=addressIndex.begin(); it!=addressIndex.end(); it++) {
         std::string address;
@@ -1153,81 +926,40 @@ UniValue getaddressdeltas(const JSONRPCRequest& request)
         }
 
         UniValue delta(UniValue::VOBJ);
-        delta.push_back(Pair("assetName", it->first.asset));
         delta.push_back(Pair("satoshis", it->second));
         delta.push_back(Pair("txid", it->first.txhash.GetHex()));
         delta.push_back(Pair("index", (int)it->first.index));
         delta.push_back(Pair("blockindex", (int)it->first.txindex));
         delta.push_back(Pair("height", it->first.blockHeight));
         delta.push_back(Pair("address", address));
-        deltas.push_back(delta);
+        result.push_back(delta);
     }
 
-    UniValue result(UniValue::VOBJ);
-
-    if (includeChainInfo && start > 0 && end > 0) {
-        LOCK(cs_main);
-
-        if (start > chainActive.Height() || end > chainActive.Height()) {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Start or end is outside chain range");
-        }
-
-        CBlockIndex* startIndex = chainActive[start];
-        CBlockIndex* endIndex = chainActive[end];
-
-        UniValue startInfo(UniValue::VOBJ);
-        UniValue endInfo(UniValue::VOBJ);
-
-        startInfo.push_back(Pair("hash", startIndex->GetBlockHash().GetHex()));
-        startInfo.push_back(Pair("height", start));
-
-        endInfo.push_back(Pair("hash", endIndex->GetBlockHash().GetHex()));
-        endInfo.push_back(Pair("height", end));
-
-        result.push_back(Pair("deltas", deltas));
-        result.push_back(Pair("start", startInfo));
-        result.push_back(Pair("end", endInfo));
-
-        return result;
-    } else {
-        return deltas;
-    }
+    return result;
 }
 
 UniValue getaddressbalance(const JSONRPCRequest& request)
 {
-    if (request.fHelp || request.params.size() > 2)
+    if (request.fHelp || request.params.size() != 1)
         throw std::runtime_error(
             "getaddressbalance\n"
             "\nReturns the balance for an address(es) (requires addressindex to be enabled).\n"
             "\nArguments:\n"
             "{\n"
-            "  \"addresses:\"\n"
+            "  \"addresses\"\n"
             "    [\n"
             "      \"address\"  (string) The base58check encoded address\n"
             "      ,...\n"
             "    ]\n"
-            "},\n"
-            "\"includeAssets\" (boolean, optional, default false)  If true this will return an expanded result which includes asset balances\n"
-            "\n"
+            "}\n"
             "\nResult:\n"
             "{\n"
-            "  \"balance\"  (string) The current balance in satoshis\n"
-            "  \"received\"  (string) The total number of satoshis received (including change)\n"
+            "  \"balance\"  (string) The current balance in duffs\n"
+            "  \"received\"  (string) The total number of duffs received (including change)\n"
             "}\n"
-            "OR\n"
-            "[\n"
-            "  {\n"
-            "    \"assetName\"  (string) The asset associated with the balance (NEOX for Neoxa)\n"
-            "    \"balance\"  (string) The current balance in satoshis\n"
-            "    \"received\"  (string) The total number of satoshis received (including change)\n"
-            "  },...\n"
-            "\n]"
             "\nExamples:\n"
-            + HelpExampleCli("getaddressbalance", "'{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"]}'")
-            + HelpExampleCli("getaddressbalance", "'{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"]}', true")
-            + HelpExampleRpc("getaddressbalance", "{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"]}")
-            + HelpExampleRpc("getaddressbalance", "{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"]}, true")
+            + HelpExampleCli("getaddressbalance", "'{\"addresses\": [\"XwnLY9Tf7Zsef8gMGL2fhWA9ZmMjt4KPwg\"]}'")
+            + HelpExampleRpc("getaddressbalance", "{\"addresses\": [\"XwnLY9Tf7Zsef8gMGL2fhWA9ZmMjt4KPwg\"]}")
         );
 
     std::vector<std::pair<uint160, int> > addresses;
@@ -1236,83 +968,35 @@ UniValue getaddressbalance(const JSONRPCRequest& request)
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address");
     }
 
-    bool includeAssets = false;
-    if (request.params.size() > 1) {
-        includeAssets = request.params[1].get_bool();
+    std::vector<std::pair<CAddressIndexKey, CAmount> > addressIndex;
+
+    for (std::vector<std::pair<uint160, int> >::iterator it = addresses.begin(); it != addresses.end(); it++) {
+        if (!GetAddressIndex((*it).first, (*it).second, addressIndex)) {
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "No information available for address");
+        }
     }
 
-    if (includeAssets) {
-        if (!AreAssetsDeployed())
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Assets aren't active.  includeAssets can't be true.");
+    CAmount balance = 0;
+    CAmount received = 0;
 
-        std::vector<std::pair<CAddressIndexKey, CAmount> > addressIndex;
-
-        for (std::vector<std::pair<uint160, int> >::iterator it = addresses.begin(); it != addresses.end(); it++) {
-            if (!GetAddressIndex((*it).first, (*it).second, addressIndex)) {
-                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "No information available for address");
-            }
+    for (std::vector<std::pair<CAddressIndexKey, CAmount> >::const_iterator it=addressIndex.begin(); it!=addressIndex.end(); it++) {
+        if (it->second > 0) {
+            received += it->second;
         }
-
-        //assetName -> (received, balance)
-        std::map<std::string, std::pair<CAmount, CAmount>> balances;
-
-        for (std::vector<std::pair<CAddressIndexKey, CAmount> >::const_iterator it = addressIndex.begin();
-             it != addressIndex.end(); it++) {
-            std::string assetName = it->first.asset;
-            if (balances.count(assetName) == 0) {
-                balances[assetName] = std::make_pair(0, 0);
-            }
-            if (it->second > 0) {
-                balances[assetName].first += it->second;
-            }
-            balances[assetName].second += it->second;
-        }
-
-        UniValue result(UniValue::VARR);
-
-        for (std::map<std::string, std::pair<CAmount, CAmount>>::const_iterator it = balances.begin();
-                it != balances.end(); it++) {
-            UniValue balance(UniValue::VOBJ);
-            balance.push_back(Pair("assetName", it->first));
-            balance.push_back(Pair("balance", it->second.second));
-            balance.push_back(Pair("received", it->second.first));
-            result.push_back(balance);
-        }
-
-        return result;
-
-    } else {
-        std::vector<std::pair<CAddressIndexKey, CAmount> > addressIndex;
-
-        for (std::vector<std::pair<uint160, int> >::iterator it = addresses.begin(); it != addresses.end(); it++) {
-            if (!GetAddressIndex((*it).first, (*it).second, NEOX, addressIndex)) {
-                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "No information available for address");
-            }
-        }
-
-        CAmount balance = 0;
-        CAmount received = 0;
-
-        for (std::vector<std::pair<CAddressIndexKey, CAmount> >::const_iterator it = addressIndex.begin();
-             it != addressIndex.end(); it++) {
-            if (it->second > 0) {
-                received += it->second;
-            }
-            balance += it->second;
-        }
-
-        UniValue result(UniValue::VOBJ);
-        result.push_back(Pair("balance", balance));
-        result.push_back(Pair("received", received));
-
-        return result;
+        balance += it->second;
     }
+
+    UniValue result(UniValue::VOBJ);
+    result.push_back(Pair("balance", balance));
+    result.push_back(Pair("received", received));
+
+    return result;
 
 }
 
 UniValue getaddresstxids(const JSONRPCRequest& request)
 {
-    if (request.fHelp || request.params.size() > 2)
+    if (request.fHelp || request.params.size() != 1)
         throw std::runtime_error(
             "getaddresstxids\n"
             "\nReturns the txids for an address(es) (requires addressindex to be enabled).\n"
@@ -1323,20 +1007,17 @@ UniValue getaddresstxids(const JSONRPCRequest& request)
             "      \"address\"  (string) The base58check encoded address\n"
             "      ,...\n"
             "    ]\n"
-            "  \"start\" (number, optional) The start block height\n"
-            "  \"end\" (number, optional) The end block height\n"
-            "},\n"
-            "\"includeAssets\" (boolean, optional, default false)  If true this will return an expanded result which includes asset transactions\n"
+            "  \"start\" (number) The start block height\n"
+            "  \"end\" (number) The end block height\n"
+            "}\n"
             "\nResult:\n"
             "[\n"
             "  \"transactionid\"  (string) The transaction id\n"
             "  ,...\n"
             "]\n"
             "\nExamples:\n"
-            + HelpExampleCli("getaddresstxids", "'{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"]}'")
-            + HelpExampleRpc("getaddresstxids", "{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"]}")
-            + HelpExampleCli("getaddresstxids", "'{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"]}', true")
-            + HelpExampleRpc("getaddresstxids", "{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"]}, true")
+            + HelpExampleCli("getaddresstxids", "'{\"addresses\": [\"XwnLY9Tf7Zsef8gMGL2fhWA9ZmMjt4KPwg\"]}'")
+            + HelpExampleRpc("getaddresstxids", "{\"addresses\": [\"XwnLY9Tf7Zsef8gMGL2fhWA9ZmMjt4KPwg\"]}")
         );
 
     std::vector<std::pair<uint160, int> > addresses;
@@ -1356,37 +1037,16 @@ UniValue getaddresstxids(const JSONRPCRequest& request)
         }
     }
 
-    bool includeAssets = false;
-    if (request.params.size() > 1) {
-        includeAssets = request.params[1].get_bool();
-    }
-
-    if (includeAssets)
-        if (!AreAssetsDeployed())
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Assets aren't active.  includeAssets can't be true.");
-
     std::vector<std::pair<CAddressIndexKey, CAmount> > addressIndex;
 
     for (std::vector<std::pair<uint160, int> >::iterator it = addresses.begin(); it != addresses.end(); it++) {
-        if (includeAssets) {
-            if (start > 0 && end > 0) {
-                if (!GetAddressIndex((*it).first, (*it).second, addressIndex, start, end)) {
-                    throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "No information available for address");
-                }
-            } else {
-                if (!GetAddressIndex((*it).first, (*it).second, addressIndex)) {
-                    throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "No information available for address");
-                }
+        if (start > 0 && end > 0) {
+            if (!GetAddressIndex((*it).first, (*it).second, addressIndex, start, end)) {
+                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "No information available for address");
             }
         } else {
-            if (start > 0 && end > 0) {
-                if (!GetAddressIndex((*it).first, (*it).second, NEOX, addressIndex, start, end)) {
-                    throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "No information available for address");
-                }
-            } else {
-                if (!GetAddressIndex((*it).first, (*it).second, NEOX, addressIndex)) {
-                    throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "No information available for address");
-                }
+            if (!GetAddressIndex((*it).first, (*it).second, addressIndex)) {
+                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "No information available for address");
             }
         }
     }
@@ -1419,7 +1079,6 @@ UniValue getaddresstxids(const JSONRPCRequest& request)
 
 UniValue getspentinfo(const JSONRPCRequest& request)
 {
-
     if (request.fHelp || request.params.size() != 1 || !request.params[0].isObject())
         throw std::runtime_error(
             "getspentinfo\n"
@@ -1465,31 +1124,197 @@ UniValue getspentinfo(const JSONRPCRequest& request)
     return obj;
 }
 
+static UniValue RPCLockedMemoryInfo()
+{
+    LockedPool::Stats stats = LockedPoolManager::Instance().stats();
+    UniValue obj(UniValue::VOBJ);
+    obj.push_back(Pair("used", uint64_t(stats.used)));
+    obj.push_back(Pair("free", uint64_t(stats.free)));
+    obj.push_back(Pair("total", uint64_t(stats.total)));
+    obj.push_back(Pair("locked", uint64_t(stats.locked)));
+    obj.push_back(Pair("chunks_used", uint64_t(stats.chunks_used)));
+    obj.push_back(Pair("chunks_free", uint64_t(stats.chunks_free)));
+    return obj;
+}
+
+#ifdef HAVE_MALLOC_INFO
+static std::string RPCMallocInfo()
+{
+    char *ptr = nullptr;
+    size_t size = 0;
+    FILE *f = open_memstream(&ptr, &size);
+    if (f) {
+        malloc_info(0, f);
+        fclose(f);
+        if (ptr) {
+            std::string rv(ptr, size);
+            free(ptr);
+            return rv;
+        }
+    }
+    return "";
+}
+#endif
+
+UniValue getmemoryinfo(const JSONRPCRequest& request)
+{
+    /* Please, avoid using the word "pool" here in the RPC interface or help,
+     * as users will undoubtedly confuse it with the other "memory pool"
+     */
+    if (request.fHelp || request.params.size() > 1)
+        throw std::runtime_error(
+            "getmemoryinfo (\"mode\")\n"
+            "Returns an object containing information about memory usage.\n"
+            "\nArguments:\n"
+            "1. \"mode\"     (string, optional, default: \"stats\") Determines what kind of information is returned.\n"
+            "  - \"stats\" returns general statistics about memory usage in the daemon.\n"
+            "  - \"mallocinfo\" returns an XML string describing low-level heap state (only available if compiled with glibc 2.10+).\n"
+            "\nResult (mode \"stats\"):\n"
+            "{\n"
+            "  \"locked\": {               (json object) Information about locked memory manager\n"
+            "    \"used\": xxxxx,          (numeric) Number of bytes used\n"
+            "    \"free\": xxxxx,          (numeric) Number of bytes available in current arenas\n"
+            "    \"total\": xxxxxxx,       (numeric) Total number of bytes managed\n"
+            "    \"locked\": xxxxxx,       (numeric) Amount of bytes that succeeded locking. If this number is smaller than total, locking pages failed at some point and key data could be swapped to disk.\n"
+            "    \"chunks_used\": xxxxx,   (numeric) Number allocated chunks\n"
+            "    \"chunks_free\": xxxxx,   (numeric) Number unused chunks\n"
+            "  }\n"
+            "}\n"
+            "\nResult (mode \"mallocinfo\"):\n"
+            "\"<malloc version=\"1\">...\"\n"
+            "\nExamples:\n"
+            + HelpExampleCli("getmemoryinfo", "")
+            + HelpExampleRpc("getmemoryinfo", "")
+        );
+
+    std::string mode = (request.params.size() < 1 || request.params[0].isNull()) ? "stats" : request.params[0].get_str();
+    if (mode == "stats") {
+        UniValue obj(UniValue::VOBJ);
+        obj.push_back(Pair("locked", RPCLockedMemoryInfo()));
+        return obj;
+    } else if (mode == "mallocinfo") {
+#ifdef HAVE_MALLOC_INFO
+        return RPCMallocInfo();
+#else
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "mallocinfo is only available when compiled with glibc 2.10+");
+#endif
+    } else {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "unknown mode " + mode);
+    }
+}
+
+uint64_t getCategoryMask(UniValue cats) {
+    cats = cats.get_array();
+    uint64_t mask = 0;
+    for (unsigned int i = 0; i < cats.size(); ++i) {
+        uint64_t flag = 0;
+        std::string cat = cats[i].get_str();
+        if (!GetLogCategory(&flag, &cat)) {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "unknown logging category " + cat);
+        }
+        mask |= flag;
+    }
+    return mask;
+}
+
+UniValue logging(const JSONRPCRequest& request)
+{
+    if (request.fHelp || request.params.size() > 2) {
+        throw std::runtime_error(
+            "logging [include,...] <exclude>\n"
+            "Gets and sets the logging configuration.\n"
+            "When called without an argument, returns the list of categories that are currently being debug logged.\n"
+            "When called with arguments, adds or removes categories from debug logging.\n"
+            "The valid logging categories are: " + ListLogCategories() + ".\n"
+            "libevent logging is configured on startup and cannot be modified by this RPC during runtime.\n"
+            "There are also a few meta-categories:\n"
+            " - \"all\", \"1\" and \"\" activate all categories at once;\n"
+            " - \"neoxa\" activates all Neoxa-specific categories at once.\n"
+            "To deactivate all categories at once you can specify \"all\" in <exclude>.\n"
+            "\nArguments:\n"
+            "1. \"include\" (array of strings) add debug logging for these categories.\n"
+            "2. \"exclude\" (array of strings) remove debug logging for these categories.\n"
+            "\nResult: <categories>  (string): a list of the logging categories that are active.\n"
+            "\nExamples:\n"
+            + HelpExampleCli("logging", "\"[\\\"all\\\"]\" \"[\\\"http\\\"]\"")
+            + HelpExampleRpc("logging", "[\"all\"], \"[libevent]\"")
+        );
+    }
+
+    uint64_t originalLogCategories = logCategories;
+    if (request.params.size() > 0 && request.params[0].isArray()) {
+        logCategories |= getCategoryMask(request.params[0]);
+    }
+
+    if (request.params.size() > 1 && request.params[1].isArray()) {
+        logCategories &= ~getCategoryMask(request.params[1]);
+    }
+
+    // Update libevent logging if BCLog::LIBEVENT has changed.
+    // If the library version doesn't allow it, UpdateHTTPServerLogging() returns false,
+    // in which case we should clear the BCLog::LIBEVENT flag.
+    // Throw an error if the user has explicitly asked to change only the libevent
+    // flag and it failed.
+    uint64_t changedLogCategories = originalLogCategories ^ logCategories;
+    if (changedLogCategories & BCLog::LIBEVENT) {
+        if (!UpdateHTTPServerLogging(logCategories & BCLog::LIBEVENT)) {
+            logCategories &= ~BCLog::LIBEVENT;
+            if (changedLogCategories == BCLog::LIBEVENT) {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "libevent logging cannot be updated when using libevent before v2.1.1.");
+            }
+        }
+    }
+
+    UniValue result(UniValue::VOBJ);
+    std::vector<CLogCategoryActive> vLogCatActive = ListActiveLogCategories();
+    for (const auto& logCatActive : vLogCatActive) {
+        result.pushKV(logCatActive.category, logCatActive.active);
+    }
+
+    return result;
+}
+
+UniValue echo(const JSONRPCRequest& request)
+{
+    if (request.fHelp)
+        throw std::runtime_error(
+            "echo|echojson \"message\" ...\n"
+            "\nSimply echo back the input arguments. This command is for testing.\n"
+            "\nThe difference between echo and echojson is that echojson has argument conversion enabled in the client-side table in"
+            "bitcoin-cli and the GUI. There is no server-side difference."
+        );
+
+    return request.params;
+}
+
 static const CRPCCommand commands[] =
-{ //  category              name                      actor (function)         argNames
+{ //  category              name                      actor (function)         okSafeMode
   //  --------------------- ------------------------  -----------------------  ----------
-    { "control",            "getinfo",                &getinfo,                {} }, /* uses wallet if enabled */
-    { "control",            "getmemoryinfo",          &getmemoryinfo,          {"mode"} },
-    { "util",               "validateaddress",        &validateaddress,        {"address"} }, /* uses wallet if enabled */
-    { "util",               "createmultisig",         &createmultisig,         {"nrequired","keys"} },
-    { "util",               "verifymessage",          &verifymessage,          {"address","signature","message"} },
-    { "util",               "signmessagewithprivkey", &signmessagewithprivkey, {"privkey","message"} },
+    { "control",            "debug",                  &debug,                  true,  {} },
+    { "control",            "getinfo",                &getinfo,                true,  {} }, /* uses wallet if enabled */
+    { "control",            "getmemoryinfo",          &getmemoryinfo,          true,  {"mode"} },
+    { "util",               "validateaddress",        &validateaddress,        true,  {"address"} }, /* uses wallet if enabled */
+    { "util",               "createmultisig",         &createmultisig,         true,  {"nrequired","keys"} },
+    { "util",               "verifymessage",          &verifymessage,          true,  {"address","signature","message"} },
+    { "util",               "signmessagewithprivkey", &signmessagewithprivkey, true,  {"privkey","message"} },
+    { "blockchain",         "getspentinfo",           &getspentinfo,           false, {"json"} },
 
     /* Address index */
-    { "addressindex",       "getaddressmempool",      &getaddressmempool,      {"addresses","includeAssets"} },
-    { "addressindex",       "getaddressutxos",        &getaddressutxos,        {"addresses"} },
-    { "addressindex",       "getaddressdeltas",       &getaddressdeltas,       {"addresses"} },
-    { "addressindex",       "getaddresstxids",        &getaddresstxids,        {"addresses","includeAssets"} },
-    { "addressindex",       "getaddressbalance",      &getaddressbalance,      {"addresses","includeAssets"} },
+    { "addressindex",       "getaddressmempool",      &getaddressmempool,      true,  {"addresses"}  },
+    { "addressindex",       "getaddressutxos",        &getaddressutxos,        false, {"addresses"} },
+    { "addressindex",       "getaddressdeltas",       &getaddressdeltas,       false, {"addresses"} },
+    { "addressindex",       "getaddresstxids",        &getaddresstxids,        false, {"addresses"} },
+    { "addressindex",       "getaddressbalance",      &getaddressbalance,      false, {"addresses"} },
 
-    /* Blockchain */
-    { "blockchain",         "getspentinfo",           &getspentinfo,           {} },
+    /* Neoxa features */
+    { "neoxa",               "mnsync",                 &mnsync,                 true,  {} },
+    { "neoxa",               "spork",                  &spork,                  true,  {"value"} },
 
     /* Not shown in help */
-    { "hidden",             "setmocktime",            &setmocktime,            {"timestamp"}},
-    { "hidden",             "echo",                   &echo,                   {"arg0","arg1","arg2","arg3","arg4","arg5","arg6","arg7","arg8","arg9"}},
-    { "hidden",             "echojson",               &echo,                   {"arg0","arg1","arg2","arg3","arg4","arg5","arg6","arg7","arg8","arg9"}},
-    { "hidden",             "logging",                &logging,                {"include", "exclude"}},
+    { "hidden",             "setmocktime",            &setmocktime,            true,  {"timestamp"}},
+    { "hidden",             "echo",                   &echo,                   true,  {"arg0","arg1","arg2","arg3","arg4","arg5","arg6","arg7","arg8","arg9"}},
+    { "hidden",             "echojson",               &echo,                   true,  {"arg0","arg1","arg2","arg3","arg4","arg5","arg6","arg7","arg8","arg9"}},
+    { "hidden",             "logging",                &logging,                true,  {"include", "exclude"}},
 };
 
 void RegisterMiscRPCCommands(CRPCTable &t)

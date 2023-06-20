@@ -1,13 +1,12 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2016 The Bitcoin Core developers
-// Copyright (c) 2017-2019 The Raven Core developers
-// Copyright (c) 2020-2021 The Neoxa Core developers
+// Copyright (c) 2017 The Dash Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #ifndef NEOXA_ARITH_UINT256_H
 #define NEOXA_ARITH_UINT256_H
-
+#include "crypto/common.h"
 #include <assert.h>
 #include <cstring>
 #include <stdexcept>
@@ -16,6 +15,7 @@
 #include <vector>
 
 class uint256;
+class uint512;
 
 class uint_error : public std::runtime_error {
 public:
@@ -212,6 +212,14 @@ public:
         return ret;
     }
 
+    void SetHex(const char* psz) {
+    	base_uint<BITS> b;
+		for(int x=0; x<b.WIDTH; ++x) {
+			memcpy((char*)&b.pn[x], psz + x*4, 4);
+		}
+		*this = b;
+    }
+
     int CompareTo(const base_uint& b) const;
     bool EqualTo(uint64_t b) const;
 
@@ -234,8 +242,9 @@ public:
     friend inline bool operator==(const base_uint& a, uint64_t b) { return a.EqualTo(b); }
     friend inline bool operator!=(const base_uint& a, uint64_t b) { return !a.EqualTo(b); }
 
+    int GET_WIDTH() const;
+    uint32_t GET_PN(int index) const;
     std::string GetHex() const;
-    void SetHex(const char* psz);
     void SetHex(const std::string& str);
     std::string ToString() const;
 
@@ -290,9 +299,35 @@ public:
 
     friend uint256 ArithToUint256(const arith_uint256 &);
     friend arith_uint256 UintToArith256(const uint256 &);
+    //std::string GetHex() const;
 };
 
 uint256 ArithToUint256(const arith_uint256 &);
 arith_uint256 UintToArith256(const uint256 &);
+
+class arith_uint512 : public base_uint<512> {
+public:
+	arith_uint512() {}
+	arith_uint512(const base_uint<512>& b) : base_uint<512>(b) {}
+	arith_uint512(const arith_uint256& b) {
+		 for (int i = 0; i < b.GET_WIDTH(); i++)
+			pn[i] = b.GET_PN(i);
+	}
+	arith_uint512(uint64_t b) : base_uint<512>(b) {}
+	explicit arith_uint512(const std::string& str) : base_uint<512>(str) {}
+
+	arith_uint256 trim256() const {
+		arith_uint256 result;
+		memcpy((void*)&result, (void*)pn, 32);
+		return result;
+	}
+	friend uint512 ArithToUint512(const arith_uint512 &);
+	friend arith_uint512 UintToArith512(const uint512 &);
+	//std::string GetHex() const;
+
+};
+
+uint512 ArithToUint512(const arith_uint512 &);
+arith_uint512 UintToArith512(const uint512 &);
 
 #endif // NEOXA_ARITH_UINT256_H

@@ -1,12 +1,8 @@
 #!/usr/bin/env python3
 # Copyright (c) 2014-2017 The Bitcoin Core developers
-# Copyright (c) 2017-2019 The Raven Core developers
-# Copyright (c) 2020-2021 The Neoxa Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-
-"""
-Test mempool persistence.
+"""Test mempool persistence.
 
 By default, neoxad will dump mempool on shutdown and
 then reload it on startup. This can be overridden with
@@ -33,18 +29,19 @@ Test is as follows:
     transactions in its mempool. This tests that -persistmempool=0
     does not overwrite a previously valid mempool stored on disk.
   - Remove node0 mempool.dat and verify savemempool RPC recreates it
-    and verify that node1 can load it and has 5 transaction in its
+    and verify that node1 can load it and has 5 transactions in its
     mempool.
   - Verify that savemempool throws when the RPC is called if
     node1 can't write to disk.
-"""
 
+"""
 import os
 import time
-from test_framework.test_framework import NeoxaTestFramework
-from test_framework.util import assert_equal, Decimal, wait_until, assert_raises_rpc_error
 
-class MempoolPersistTest(NeoxaTestFramework):
+from test_framework.test_framework import BitcoinTestFramework
+from test_framework.util import *
+
+class MempoolPersistTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 3
         self.extra_args = [[], ["-persistmempool=0"], []]
@@ -58,22 +55,31 @@ class MempoolPersistTest(NeoxaTestFramework):
         self.sync_all()
 
         self.log.debug("Send 5 transactions from node2 (to its own address)")
-        for _ in range(5):
+        for i in range(5):
             self.nodes[2].sendtoaddress(self.nodes[2].getnewaddress(), Decimal("10"))
+        node2_balance = self.nodes[2].getbalance()
         self.sync_all()
 
         self.log.debug("Verify that node0 and node1 have 5 transactions in their mempools")
         assert_equal(len(self.nodes[0].getrawmempool()), 5)
         assert_equal(len(self.nodes[1].getrawmempool()), 5)
 
-        self.log.debug("Stop-start node0 and node1. Verify that node0 has the transactions in its mempool and node1 does not.")
+        self.log.debug("Stop-start the nodes. Verify that node0 has the transactions in its mempool and node1 does not. Verify that node2 calculates its balance correctly after loading wallet transactions.")
         self.stop_nodes()
+        # Give this node a head-start, so we can be "extra-sure" that it didn't load anything later
+        # Also don't store the mempool, to keep the datadir clean
+        self.start_node(1, extra_args=["-persistmempool=0"])
         self.start_node(0)
-        self.start_node(1)
+        self.start_node(2)
         # Give neoxad a second to reload the mempool
-        time.sleep(1)
-        wait_until(lambda: len(self.nodes[0].getrawmempool()) == 5, err_msg="Wait for getRawMempool")
+        wait_until(lambda: len(self.nodes[0].getrawmempool()) == 5, timeout=1)
+        wait_until(lambda: len(self.nodes[2].getrawmempool()) == 5, timeout=1)
+        # The others have loaded their mempool. If node_1 loaded anything, we'd probably notice by now:
         assert_equal(len(self.nodes[1].getrawmempool()), 0)
+
+        # Verify accounting of mempool transactions after restart is correct
+        self.nodes[2].syncwithvalidationinterfacequeue()  # Flush mempool to wallet
+        assert_equal(node2_balance, self.nodes[2].getbalance())
 
         self.log.debug("Stop-start node0 with -persistmempool=0. Verify that it doesn't load its mempool.dat file.")
         self.stop_nodes()
@@ -85,10 +91,10 @@ class MempoolPersistTest(NeoxaTestFramework):
         self.log.debug("Stop-start node0. Verify that it has the transactions in its mempool.")
         self.stop_nodes()
         self.start_node(0)
-        wait_until(lambda: len(self.nodes[0].getrawmempool()) == 5, err_msg="Wait for getRawMempool")
+        wait_until(lambda: len(self.nodes[0].getrawmempool()) == 5)
 
-        mempooldat0 = os.path.join(self.options.tmpdir, 'node0', 'regtest', 'mempool.dat')
-        mempooldat1 = os.path.join(self.options.tmpdir, 'node1', 'regtest', 'mempool.dat')
+        mempooldat0 = os.path.join(self.nodes[0].datadir, self.chain, 'mempool.dat')
+        mempooldat1 = os.path.join(self.nodes[1].datadir, self.chain, 'mempool.dat')
         self.log.debug("Remove the mempool.dat file. Verify that savemempool to disk via RPC re-creates it")
         os.remove(mempooldat0)
         self.nodes[0].savemempool()
@@ -98,16 +104,15 @@ class MempoolPersistTest(NeoxaTestFramework):
         os.rename(mempooldat0, mempooldat1)
         self.stop_nodes()
         self.start_node(1, extra_args=[])
-        wait_until(lambda: len(self.nodes[1].getrawmempool()) == 5, err_msg="Wait for getRawMempool")
+        wait_until(lambda: len(self.nodes[1].getrawmempool()) == 5)
 
         self.log.debug("Prevent neoxad from writing mempool.dat to disk. Verify that `savemempool` fails")
-        # to test the exception we are setting bad permissions on a tmp file called mempool.dat.new
+        # to test the exception we are creating a tmp folder called mempool.dat.new
         # which is an implementation detail that could change and break this test
         mempooldotnew1 = mempooldat1 + '.new'
-        with os.fdopen(os.open(mempooldotnew1, os.O_CREAT, 0o000), 'w'):
-            pass
+        os.mkdir(mempooldotnew1)
         assert_raises_rpc_error(-1, "Unable to dump mempool to disk", self.nodes[1].savemempool)
-        os.remove(mempooldotnew1)
+        os.rmdir(mempooldotnew1)
 
 if __name__ == '__main__':
     MempoolPersistTest().main()

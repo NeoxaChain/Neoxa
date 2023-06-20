@@ -1,8 +1,9 @@
 #!/bin/sh
 # Copyright (c) 2014-2016 The Bitcoin Core developers
-# Copyright (c) 2017-2019 The Neoxa__Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
+
+export LC_ALL=C
 
 DIR=$(dirname "$0")
 [ "/${DIR#/}" != "$DIR" ] && DIR=$(dirname "$(pwd)/$0")
@@ -12,8 +13,6 @@ echo "Using verify-commits data from ${DIR}"
 VERIFIED_ROOT=$(cat "${DIR}/trusted-git-root")
 VERIFIED_SHA512_ROOT=$(cat "${DIR}/trusted-sha512-root-commit")
 REVSIG_ALLOWED=$(cat "${DIR}/allow-revsig-commits")
-
-HAVE_FAILED=false
 
 HAVE_GNU_SHA512=1
 [ ! -x "$(which sha512sum)" ] && HAVE_GNU_SHA512=0
@@ -36,10 +35,11 @@ fi
 
 NO_SHA1=1
 PREV_COMMIT=""
+INITIAL_COMMIT="${CURRENT_COMMIT}"
 
 while true; do
 	if [ "$CURRENT_COMMIT" = $VERIFIED_ROOT ]; then
-		echo "There is a valid path from "$CURRENT_COMMIT" to $VERIFIED_ROOT where all commits are signed!"
+		echo "There is a valid path from \"$INITIAL_COMMIT\" to $VERIFIED_ROOT where all commits are signed!"
 		exit 0
 	fi
 
@@ -52,15 +52,15 @@ while true; do
 	fi
 
 	if [ "$NO_SHA1" = "1" ]; then
-		export NEOXA_VERIFY_COMMITS_ALLOW_SHA1=0
+		export BITCOIN_VERIFY_COMMITS_ALLOW_SHA1=0
 	else
-		export NEOXA_VERIFY_COMMITS_ALLOW_SHA1=1
+		export BITCOIN_VERIFY_COMMITS_ALLOW_SHA1=1
 	fi
 
 	if [ "${REVSIG_ALLOWED#*$CURRENT_COMMIT}" != "$REVSIG_ALLOWED" ]; then
-		export NEOXA_VERIFY_COMMITS_ALLOW_REVSIG=1
+		export BITCOIN_VERIFY_COMMITS_ALLOW_REVSIG=1
 	else
-		export NEOXA_VERIFY_COMMITS_ALLOW_REVSIG=0
+		export BITCOIN_VERIFY_COMMITS_ALLOW_REVSIG=0
 	fi
 
 	if ! git -c "gpg.program=${DIR}/gpg.sh" verify-commit "$CURRENT_COMMIT" > /dev/null; then
@@ -96,9 +96,9 @@ while true; do
 		FILE_HASHES=""
 		for FILE in $(git ls-tree --full-tree -r --name-only "$CURRENT_COMMIT" | LC_ALL=C sort); do
 			if [ "$HAVE_GNU_SHA512" = 1 ]; then
-				HASH=$(git cat-file blob "$CURRENT_COMMIT":"$FILE" | sha512sum | { read FIRST OTHER; echo $FIRST; } )
+				HASH=$(git cat-file blob "$CURRENT_COMMIT":"$FILE" | sha512sum | { read FIRST _; echo $FIRST; } )
 			else
-				HASH=$(git cat-file blob "$CURRENT_COMMIT":"$FILE" | shasum -a 512 | { read FIRST OTHER; echo $FIRST; } )
+				HASH=$(git cat-file blob "$CURRENT_COMMIT":"$FILE" | shasum -a 512 | { read FIRST _; echo $FIRST; } )
 			fi
 			[ "$FILE_HASHES" != "" ] && FILE_HASHES="$FILE_HASHES"'
 '

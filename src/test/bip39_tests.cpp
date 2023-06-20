@@ -1,6 +1,7 @@
-//
-// Created by ROSHii on 2019-06-01.
-//
+// Copyright (c) 2014-2020 The Dash Core developers
+// Copyright (c) 2020 The Neoxa developers
+// Distributed under the MIT software license, see the accompanying
+// file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "base58.h"
 #include "data/bip39_vectors.json.h"
@@ -8,7 +9,7 @@
 #include "util.h"
 #include "utilstrencodings.h"
 #include "test/test_neoxa.h"
-#include "wallet/bip39.h"
+#include "bip39.h"
 
 #include <boost/test/unit_test.hpp>
 
@@ -54,12 +55,12 @@ BOOST_AUTO_TEST_CASE(bip39_vectors)
         CExtKey key;
         CExtPubKey pubkey;
 
-        key.SetSeed(&seed[0], 64);
+        key.SetMaster(&seed[0], 64);
         pubkey = key.Neuter();
 
-        CNeoxaExtKey b58key;
+        CBitcoinExtKey b58key;
         b58key.SetKey(key);
-        // printf("CNeoxaExtKey: %s\n", b58key.ToString().c_str());
+        // printf("CBitcoinExtKey: %s\n", b58key.ToString().c_str());
         BOOST_CHECK(b58key.ToString() == test[3].get_str());
     }
 }

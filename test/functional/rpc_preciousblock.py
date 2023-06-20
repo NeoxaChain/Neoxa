@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-# Copyright (c) 2015-2016 The Bitcoin Core developers
-# Copyright (c) 2017-2019 The Raven Core developers
-# Copyright (c) 2020-2021 The Neoxa Core developers
+# Copyright (c) 2015 The Bitcoin Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-
 """Test the preciousblock RPC."""
 
-from test_framework.test_framework import NeoxaTestFramework
-from test_framework.util import assert_equal, connect_nodes_bi, sync_chain, sync_blocks
+from test_framework.test_framework import BitcoinTestFramework
+from test_framework.util import (
+    assert_equal,
+    connect_nodes_bi,
+    sync_blocks,
+)
 
-# noinspection PyBroadException
 def unidirectional_node_sync_via_rpc(node_src, node_dest):
     blocks_to_copy = []
     blockhash = node_src.getbestblockhash()
@@ -23,8 +23,8 @@ def unidirectional_node_sync_via_rpc(node_src, node_dest):
             blockhash = node_src.getblockheader(blockhash, True)['previousblockhash']
     blocks_to_copy.reverse()
     for blockhash in blocks_to_copy:
-        block_data = node_src.getblock(blockhash, False)
-        assert(node_dest.submitblock(block_data) in (None, 'inconclusive'))
+        blockdata = node_src.getblock(blockhash, False)
+        assert(node_dest.submitblock(blockdata) in (None, 'inconclusive'))
 
 def node_sync_via_rpc(nodes):
     for node_src in nodes:
@@ -33,11 +33,10 @@ def node_sync_via_rpc(nodes):
                 continue
             unidirectional_node_sync_via_rpc(node_src, node_dest)
 
-class PreciousTest(NeoxaTestFramework):
+class PreciousTest(BitcoinTestFramework):
     def set_test_params(self):
         self.setup_clean_chain = True
         self.num_nodes = 3
-        self.extra_args = [["-maxreorg=10000"], ["-maxreorg=10000"], ["-maxreorg=10000"]]
 
     def setup_network(self):
         self.setup_nodes()
@@ -72,7 +71,7 @@ class PreciousTest(NeoxaTestFramework):
         assert_equal(self.nodes[0].getbestblockhash(), hashC)
         self.log.info("Make Node1 prefer block C")
         self.nodes[1].preciousblock(hashC)
-        sync_chain(self.nodes[0:2]) # wait because node 1 may not have downloaded hashC
+        sync_blocks(self.nodes[0:2])  # wait because node 1 may not have downloaded hashC
         assert_equal(self.nodes[1].getbestblockhash(), hashC)
         self.log.info("Make Node1 prefer block G again")
         self.nodes[1].preciousblock(hashG)
@@ -86,7 +85,7 @@ class PreciousTest(NeoxaTestFramework):
         self.log.info("Mine another block (E-F-G-)H on Node 0 and reorg Node 1")
         self.nodes[0].generate(1)
         assert_equal(self.nodes[0].getblockcount(), 6)
-        sync_blocks(self.nodes[0:2])
+        self.sync_blocks(self.nodes[0:2])
         hashH = self.nodes[0].getbestblockhash()
         assert_equal(self.nodes[1].getbestblockhash(), hashH)
         self.log.info("Node1 should not be able to prefer block C anymore")

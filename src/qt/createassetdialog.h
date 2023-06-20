@@ -1,11 +1,10 @@
 // Copyright (c) 2011-2014 The Bitcoin Core developers
 // Copyright (c) 2017-2019 The Raven Core developers
-// Copyright (c) 2020-2021 The Neoxa Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef NEOXA_QT_CREATEASSETDIALOG_H
-#define NEOXA_QT_CREATEASSETDIALOG_H
+#ifndef RAVEN_QT_CREATEASSETDIALOG_H
+#define RAVEN_QT_CREATEASSETDIALOG_H
 
 #include "walletmodel.h"
 
@@ -95,12 +94,14 @@ private:
     void updateFeeMinimizedLabel();
     void minimizeFeeSection(bool fMinimize);
 
-    //Validation
+    // Validation
+    // Returns true if this is an IPFS-hash or TXID.
     bool checkIPFSHash(QString hash);
 
 private Q_SLOTS:
     void ipfsStateChanged();
     void checkAvailabilityClicked();
+    void openIpfsBrowser();
     void onNameChanged(QString name);
     void onAddressNameChanged(QString address);
     void onIPFSHashChanged(QString hash);
@@ -133,9 +134,9 @@ private Q_SLOTS:
     void updateFeeSectionControls();
     void updateMinFeeLabel();
     void updateSmartFeeLabel();
-    void feeControlFeatureChanged(bool);
+    //void feeControlFeatureChanged(bool);
 
-    void setBalance(const CAmount& balance, const CAmount& unconfirmedBalance, const CAmount& immatureBalance,
+    void setBalance(const CAmount& balance, const CAmount& unconfirmedBalance, const CAmount& immatureBalance, const CAmount& anonymizedBalance,
                     const CAmount& watchOnlyBalance, const CAmount& watchUnconfBalance, const CAmount& watchImmatureBalance);
     void updateDisplayUnit();
 
@@ -152,4 +153,4 @@ Q_SIGNALS:
     void message(const QString &title, const QString &message, unsigned int style);
 };
 
-#endif // NEOXA_QT_CREATEASSETDIALOG_H
+#endif // RAVEN_QT_CREATEASSETDIALOG_H

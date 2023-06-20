@@ -1,18 +1,15 @@
 // Copyright (c) 2011-2014 The Bitcoin Core developers
-// Copyright (c) 2017-2019 The Raven Core developers
-// Copyright (c) 2020-2021 The Neoxa Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef NEOXA_QT_WALLETMODELTRANSACTION_H
-#define NEOXA_QT_WALLETMODELTRANSACTION_H
+#ifndef BITCOIN_QT_WALLETMODELTRANSACTION_H
+#define BITCOIN_QT_WALLETMODELTRANSACTION_H
 
 #include "walletmodel.h"
 
 #include <QObject>
 
 class SendCoinsRecipient;
-class SendAssetsRecipient;
 
 class CReserveKey;
 class CWallet;
@@ -25,20 +22,20 @@ public:
     explicit WalletModelTransaction(const QList<SendCoinsRecipient> &recipients);
     ~WalletModelTransaction();
 
-    QList<SendCoinsRecipient> getRecipients() const;
+    QList<SendCoinsRecipient> getRecipients();
 
-    CWalletTx *getTransaction() const;
+    CWalletTx *getTransaction();
     unsigned int getTransactionSize();
 
     void setTransactionFee(const CAmount& newFee);
-    CAmount getTransactionFee() const;
+    CAmount getTransactionFee();
 
-    CAmount getTotalTransactionAmount() const;
+    CAmount getTotalTransactionAmount();
 
     void newPossibleKeyChange(CWallet *wallet);
     CReserveKey *getPossibleKeyChange();
 
-    void reassignAmounts(int nChangePosRet); // needed for the subtract-fee-from-amount feature
+    void reassignAmounts(); // needed for the subtract-fee-from-amount feature
 
 private:
     QList<SendCoinsRecipient> recipients;
@@ -47,4 +44,4 @@ private:
     CAmount fee;
 };
 
-#endif // NEOXA_QT_WALLETMODELTRANSACTION_H
+#endif // BITCOIN_QT_WALLETMODELTRANSACTION_H

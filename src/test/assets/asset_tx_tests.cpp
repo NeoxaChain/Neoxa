@@ -26,7 +26,7 @@ BOOST_FIXTURE_TEST_SUITE(asset_tx_tests, BasicTestingSetup)
 
         // Create the asset scriptPubKey
         CAssetTransfer asset("NEOXATEST", 1000);
-        CScript scriptPubKey = GetScriptForDestination(DecodeDestination(GetParams().GlobalBurnAddress()));
+        CScript scriptPubKey = GetScriptForDestination(DecodeDestination(Params().GlobalBurnAddress()));
         asset.ConstructTransaction(scriptPubKey);
 
         CCoinsView view;
@@ -74,7 +74,7 @@ BOOST_FIXTURE_TEST_SUITE(asset_tx_tests, BasicTestingSetup)
 
         // Create the asset scriptPubKey
         CAssetTransfer asset("NEOXATEST", 1000);
-        CScript scriptPubKey = GetScriptForDestination(DecodeDestination(GetParams().GlobalBurnAddress()));
+        CScript scriptPubKey = GetScriptForDestination(DecodeDestination(Params().GlobalBurnAddress()));
         asset.ConstructTransaction(scriptPubKey);
 
         CCoinsView view;
@@ -102,7 +102,7 @@ BOOST_FIXTURE_TEST_SUITE(asset_tx_tests, BasicTestingSetup)
         // Create CTxOut that will only send 100 of the asset
         // This should fail because 900 NEOXA doesn't have a destination
         CAssetTransfer assetTransfer("NEOXATEST", 100);
-        CScript scriptLess = GetScriptForDestination(DecodeDestination(GetParams().GlobalBurnAddress()));
+        CScript scriptLess = GetScriptForDestination(DecodeDestination(Params().GlobalBurnAddress()));
         assetTransfer.ConstructTransaction(scriptLess);
 
         CTxOut txOut2;
@@ -131,7 +131,7 @@ BOOST_FIXTURE_TEST_SUITE(asset_tx_tests, BasicTestingSetup)
 
         // Create the asset scriptPubKey
         CAssetTransfer asset("NEOXATEST", 1000);
-        CScript scriptPubKey = GetScriptForDestination(DecodeDestination(GetParams().GlobalBurnAddress()));
+        CScript scriptPubKey = GetScriptForDestination(DecodeDestination(Params().GlobalBurnAddress()));
         asset.ConstructTransaction(scriptPubKey);
 
         CCoinsView view;
@@ -160,7 +160,7 @@ BOOST_FIXTURE_TEST_SUITE(asset_tx_tests, BasicTestingSetup)
         for (int i = 0; i < 10; i++)
         {
             CAssetTransfer asset2("NEOXATEST", 100);
-            CScript scriptPubKey2 = GetScriptForDestination(DecodeDestination(GetParams().GlobalBurnAddress()));
+            CScript scriptPubKey2 = GetScriptForDestination(DecodeDestination(Params().GlobalBurnAddress()));
             asset2.ConstructTransaction(scriptPubKey2);
 
             CTxOut txOut2;
@@ -192,7 +192,7 @@ BOOST_FIXTURE_TEST_SUITE(asset_tx_tests, BasicTestingSetup)
 
         // Create the asset scriptPubKey
         CAssetTransfer asset("NEOXATEST", 1000);
-        CScript scriptPubKey = GetScriptForDestination(DecodeDestination(GetParams().GlobalBurnAddress()));
+        CScript scriptPubKey = GetScriptForDestination(DecodeDestination(Params().GlobalBurnAddress()));
         asset.ConstructTransaction(scriptPubKey);
 
         CCoinsView view;
@@ -221,7 +221,7 @@ BOOST_FIXTURE_TEST_SUITE(asset_tx_tests, BasicTestingSetup)
         for (int i = 0; i < 12; i++)
         {
             CAssetTransfer asset2("NEOXATEST", 100);
-            CScript scriptPubKey2 = GetScriptForDestination(DecodeDestination(GetParams().GlobalBurnAddress()));
+            CScript scriptPubKey2 = GetScriptForDestination(DecodeDestination(Params().GlobalBurnAddress()));
             asset2.ConstructTransaction(scriptPubKey2);
 
             CTxOut txOut2;
@@ -253,15 +253,15 @@ BOOST_FIXTURE_TEST_SUITE(asset_tx_tests, BasicTestingSetup)
 
         // Create the asset scriptPubKeys
         CAssetTransfer asset("NEOXATEST", 1000);
-        CScript scriptPubKey = GetScriptForDestination(DecodeDestination(GetParams().GlobalBurnAddress()));
+        CScript scriptPubKey = GetScriptForDestination(DecodeDestination(Params().GlobalBurnAddress()));
         asset.ConstructTransaction(scriptPubKey);
 
         CAssetTransfer asset2("NEOXATESTTEST", 1000);
-        CScript scriptPubKey2 = GetScriptForDestination(DecodeDestination(GetParams().GlobalBurnAddress()));
+        CScript scriptPubKey2 = GetScriptForDestination(DecodeDestination(Params().GlobalBurnAddress()));
         asset2.ConstructTransaction(scriptPubKey2);
 
         CAssetTransfer asset3("NEOXATESTTESTTEST", 1000);
-        CScript scriptPubKey3 = GetScriptForDestination(DecodeDestination(GetParams().GlobalBurnAddress()));
+        CScript scriptPubKey3 = GetScriptForDestination(DecodeDestination(Params().GlobalBurnAddress()));
         asset3.ConstructTransaction(scriptPubKey3);
 
         CCoinsView view;
@@ -318,7 +318,7 @@ BOOST_FIXTURE_TEST_SUITE(asset_tx_tests, BasicTestingSetup)
         {
             // Add the first asset
             CAssetTransfer outAsset("NEOXATEST", 100);
-            CScript outScript = GetScriptForDestination(DecodeDestination(GetParams().GlobalBurnAddress()));
+            CScript outScript = GetScriptForDestination(DecodeDestination(Params().GlobalBurnAddress()));
             outAsset.ConstructTransaction(outScript);
 
             CTxOut txOutNew;
@@ -329,7 +329,7 @@ BOOST_FIXTURE_TEST_SUITE(asset_tx_tests, BasicTestingSetup)
 
             // Add the second asset
             CAssetTransfer outAsset2("NEOXATESTTEST", 100);
-            CScript outScript2 = GetScriptForDestination(DecodeDestination(GetParams().GlobalBurnAddress()));
+            CScript outScript2 = GetScriptForDestination(DecodeDestination(Params().GlobalBurnAddress()));
             outAsset2.ConstructTransaction(outScript2);
 
             CTxOut txOutNew2;
@@ -340,7 +340,7 @@ BOOST_FIXTURE_TEST_SUITE(asset_tx_tests, BasicTestingSetup)
 
             // Add the third asset
             CAssetTransfer outAsset3("NEOXATESTTESTTEST", 100);
-            CScript outScript3 = GetScriptForDestination(DecodeDestination(GetParams().GlobalBurnAddress()));
+            CScript outScript3 = GetScriptForDestination(DecodeDestination(Params().GlobalBurnAddress()));
             outAsset3.ConstructTransaction(outScript3);
 
             CTxOut txOutNew3;
@@ -373,7 +373,7 @@ BOOST_FIXTURE_TEST_SUITE(asset_tx_tests, BasicTestingSetup)
         {
             // Add the first asset
             CAssetTransfer outAsset("NEOXATEST", 100);
-            CScript outScript = GetScriptForDestination(DecodeDestination(GetParams().GlobalBurnAddress()));
+            CScript outScript = GetScriptForDestination(DecodeDestination(Params().GlobalBurnAddress()));
             outAsset.ConstructTransaction(outScript);
 
             CTxOut txOutNew;
@@ -384,7 +384,7 @@ BOOST_FIXTURE_TEST_SUITE(asset_tx_tests, BasicTestingSetup)
 
             // Add the second asset
             CAssetTransfer outAsset2("NEOXATESTTEST", 100);
-            CScript outScript2 = GetScriptForDestination(DecodeDestination(GetParams().GlobalBurnAddress()));
+            CScript outScript2 = GetScriptForDestination(DecodeDestination(Params().GlobalBurnAddress()));
             outAsset2.ConstructTransaction(outScript2);
 
             CTxOut txOutNew2;
@@ -395,7 +395,7 @@ BOOST_FIXTURE_TEST_SUITE(asset_tx_tests, BasicTestingSetup)
 
             // Add the third asset
             CAssetTransfer outAsset3("NEOXATESTTESTTEST", 100);
-            CScript outScript3 = GetScriptForDestination(DecodeDestination(GetParams().GlobalBurnAddress()));
+            CScript outScript3 = GetScriptForDestination(DecodeDestination(Params().GlobalBurnAddress()));
             outAsset3.ConstructTransaction(outScript3);
 
             CTxOut txOutNew3;
@@ -487,7 +487,7 @@ BOOST_FIXTURE_TEST_SUITE(asset_tx_tests, BasicTestingSetup)
 
         // Create the reissue asset
         CReissueAsset reissueAsset("ENFORCE_VALUE", 100, 8, true, "");
-        CScript scriptPubKey = GetScriptForDestination(DecodeDestination(GetParams().GlobalBurnAddress()));
+        CScript scriptPubKey = GetScriptForDestination(DecodeDestination(Params().GlobalBurnAddress()));
         reissueAsset.ConstructTransaction(scriptPubKey);
 
         // Create an invalid reissue asset with nValue not equal to zero
@@ -525,7 +525,7 @@ BOOST_FIXTURE_TEST_SUITE(asset_tx_tests, BasicTestingSetup)
         bool fCheckBlock = false;
 
         // Check that the CheckTransaction will fail when trying to add it to the mempool
-        bool fCheck = !CheckTransaction(tx, state, true, fCheckMempool, fCheckBlock);
+        bool fCheck = !CheckTransaction(tx, state, 0, 0, fCheckMempool, fCheckBlock);
 
         BOOST_CHECK(fCheck);
         BOOST_CHECK(state.GetRejectReason() == "bad-mempool-txns-asset-reissued-amount-isn't-zero");
@@ -534,9 +534,9 @@ BOOST_FIXTURE_TEST_SUITE(asset_tx_tests, BasicTestingSetup)
         fCheckMempool = false;
         fCheckBlock = true;
         // Turn on the BIP that enforces the block check
-        SetEnforcedValues(true);
+        //SetEnforcedValues(true);
 
-        fCheck = !CheckTransaction(tx, state, true, fCheckMempool, fCheckBlock);
+        fCheck = !CheckTransaction(tx, state, 0, 0, fCheckMempool, fCheckBlock);
         BOOST_CHECK(fCheck);
         BOOST_CHECK(state.GetRejectReason() == "bad-txns-asset-reissued-amount-isn't-zero");
     }

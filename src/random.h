@@ -1,12 +1,10 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2016 The Bitcoin Core developers
-// Copyright (c) 2017-2019 The Raven Core developers
-// Copyright (c) 2020-2021 The Neoxa Core developers
+// Copyright (c) 2009-2014 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef NEOXA_RANDOM_H
-#define NEOXA_RANDOM_H
+#ifndef BITCOIN_RANDOM_H
+#define BITCOIN_RANDOM_H
 
 #include "crypto/chacha20.h"
 #include "crypto/common.h"
@@ -24,6 +22,8 @@ void GetRandBytes(unsigned char* buf, int num);
 uint64_t GetRand(uint64_t nMax);
 int GetRandInt(int nMax);
 uint256 GetRandHash();
+
+bool GetRandBool(double rate);
 
 /**
  * Add a little bit of randomness to the output of GetStrongRangBytes.
@@ -61,7 +61,7 @@ private:
         if (requires_seed) {
             RandomSeed();
         }
-        rng.Output(bytebuf, sizeof(bytebuf));
+        rng.Keystream(bytebuf, sizeof(bytebuf));
         bytebuf_size = sizeof(bytebuf);
     }
 
@@ -112,6 +112,14 @@ public:
         }
     }
 
+    uint32_t rand32(uint32_t nMax) {
+        return rand32() % nMax;
+    }
+
+    uint32_t operator()(uint32_t nMax) {
+        return rand32(nMax);
+    }
+
     /** Generate random bytes. */
     std::vector<unsigned char> randbytes(size_t len);
 
@@ -124,6 +132,29 @@ public:
     /** Generate a random boolean. */
     bool randbool() { return randbits(1); }
 };
+
+/** More efficient than using std::Shuffle on a FastRandomContext.
+ *
+ * This is more efficient as std::Shuffle will consume entropy in groups of
+ * 64 bits at the time and throw away most.
+ *
+ * This also works around a bug in libstdc++ std::Shuffle that may cause
+ * type::operator=(type&&) to be invoked on itself, which the library's
+ * debug mode detects and panics on. This is a known issue, see
+ * https://stackoverflow.com/questions/22915325/avoiding-self-assignment-in-stdshuffle
+ */
+template<typename I, typename R>
+void Shuffle(I first, I last, R&& rng)
+{
+    while (first != last) {
+        size_t j = rng.randrange(last - first);
+        if (j) {
+            using std::swap;
+            swap(*first, *(first + j));
+        }
+        ++first;
+    }
+}
 
 /* Number of random bytes returned by GetOSRand.
  * When changing this constant make sure to change all call sites, and make
@@ -145,4 +176,4 @@ bool Random_SanityCheck();
 /** Initialize the RNG. */
 void RandomInit();
 
-#endif // NEOXA_RANDOM_H
+#endif // BITCOIN_RANDOM_H

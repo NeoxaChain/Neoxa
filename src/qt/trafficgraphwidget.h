@@ -1,11 +1,13 @@
 // Copyright (c) 2011-2015 The Bitcoin Core developers
-// Copyright (c) 2017-2019 The Raven Core developers
-// Copyright (c) 2020-2021 The Neoxa Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef NEOXA_QT_TRAFFICGRAPHWIDGET_H
-#define NEOXA_QT_TRAFFICGRAPHWIDGET_H
+#ifndef BITCOIN_QT_TRAFFICGRAPHWIDGET_H
+#define BITCOIN_QT_TRAFFICGRAPHWIDGET_H
+
+#include "trafficgraphdata.h"
+
+#include <boost/function.hpp>
 
 #include <QWidget>
 #include <QQueue>
@@ -31,20 +33,18 @@ protected:
 
 public Q_SLOTS:
     void updateRates();
-    void setGraphRangeMins(int mins);
+    void setGraphRangeMins(int value);
     void clear();
 
 private:
-    void paintPath(QPainterPath &path, QQueue<float> &samples);
+    typedef boost::function<float(const TrafficSample&)> SampleChooser;
+    void paintPath(QPainterPath &path, const TrafficGraphData::SampleQueue &queue, SampleChooser chooser);
 
     QTimer *timer;
     float fMax;
     int nMins;
-    QQueue<float> vSamplesIn;
-    QQueue<float> vSamplesOut;
-    quint64 nLastBytesIn;
-    quint64 nLastBytesOut;
     ClientModel *clientModel;
+    TrafficGraphData trafficGraphData;
 };
 
-#endif // NEOXA_QT_TRAFFICGRAPHWIDGET_H
+#endif // BITCOIN_QT_TRAFFICGRAPHWIDGET_H

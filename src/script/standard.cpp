@@ -1,19 +1,16 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2016 The Bitcoin Core developers
-// Copyright (c) 2017-2019 The Raven Core developers
-// Copyright (c) 2020-2021 The Neoxa Core developers
+// Copyright (c) 2009-2015 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include <base58.h>
-#include <assets/assets.h>
-#include <validation.h>
 #include "script/standard.h"
 
 #include "pubkey.h"
 #include "script/script.h"
 #include "util.h"
 #include "utilstrencodings.h"
+#include <assets/assets.h>
+
 
 typedef std::vector<unsigned char> valtype;
 
@@ -36,15 +33,18 @@ const char* GetTxnOutputType(txnouttype t)
     case TX_WITNESS_V0_KEYHASH: return "witness_v0_keyhash";
     case TX_WITNESS_V0_SCRIPTHASH: return "witness_v0_scripthash";
 
-    /** NEOXA START */
+    /** NEOX ASSETS START */
     case TX_NEW_ASSET: return ASSET_NEW_STRING;
     case TX_TRANSFER_ASSET: return ASSET_TRANSFER_STRING;
     case TX_REISSUE_ASSET: return ASSET_REISSUE_STRING;
-    /** NEOXA END */
+    /** NEOX ASSETS END */
     }
     return nullptr;
 }
 
+/**
+ * Return public keys or hashes from scriptPubKey, for 'standard' transaction types.
+ */
 bool Solver(const CScript& scriptPubKey, txnouttype& typeRet, std::vector<std::vector<unsigned char> >& vSolutionsRet)
 {
     // Templates
@@ -54,7 +54,7 @@ bool Solver(const CScript& scriptPubKey, txnouttype& typeRet, std::vector<std::v
         // Standard tx, sender provides pubkey, receiver adds signature
         mTemplates.insert(std::make_pair(TX_PUBKEY, CScript() << OP_PUBKEY << OP_CHECKSIG));
 
-        // Neoxa address tx, sender provides hash of pubkey, receiver provides signature and pubkey
+        // Bitcoin address tx, sender provides hash of pubkey, receiver provides signature and pubkey
         mTemplates.insert(std::make_pair(TX_PUBKEYHASH, CScript() << OP_DUP << OP_HASH160 << OP_PUBKEYHASH << OP_EQUALVERIFY << OP_CHECKSIG));
 
         // Sender provides N pubkeys, receivers provides M signatures
@@ -72,7 +72,8 @@ bool Solver(const CScript& scriptPubKey, txnouttype& typeRet, std::vector<std::v
         vSolutionsRet.push_back(hashBytes);
         return true;
     }
-    /** NEOXA START */
+
+    /** NEOX START */
     int nType = 0;
     bool fIsOwner = false;
     if (scriptPubKey.IsAssetScript(nType, fIsOwner)) {
@@ -81,7 +82,7 @@ bool Solver(const CScript& scriptPubKey, txnouttype& typeRet, std::vector<std::v
         vSolutionsRet.push_back(hashBytes);
         return true;
     }
-    /** NEOXA END */
+    /** NEOX END */
 
     int witnessversion;
     std::vector<unsigned char> witnessprogram;
@@ -122,7 +123,6 @@ bool Solver(const CScript& scriptPubKey, txnouttype& typeRet, std::vector<std::v
         }
         return true;
     }
-
     // Scan templates
     const CScript& script1 = scriptPubKey;
     for (const std::pair<txnouttype, CScript>& tplate : mTemplates)
@@ -212,9 +212,8 @@ bool ExtractDestination(const CScript& scriptPubKey, CTxDestination& addressRet)
 {
     std::vector<valtype> vSolutions;
     txnouttype whichType;
-    if (!Solver(scriptPubKey, whichType, vSolutions)) {
+    if (!Solver(scriptPubKey, whichType, vSolutions))
         return false;
-    }
 
     if (whichType == TX_PUBKEY)
     {
@@ -234,7 +233,7 @@ bool ExtractDestination(const CScript& scriptPubKey, CTxDestination& addressRet)
     {
         addressRet = CScriptID(uint160(vSolutions[0]));
         return true;
-    /** NEOXA START */
+    /** NEOX ASSETS START */
     } else if (whichType == TX_NEW_ASSET || whichType == TX_REISSUE_ASSET || whichType == TX_TRANSFER_ASSET) {
         addressRet = CKeyID(uint160(vSolutions[0]));
         return true;
@@ -243,8 +242,8 @@ bool ExtractDestination(const CScript& scriptPubKey, CTxDestination& addressRet)
             addressRet = CKeyID(uint160(vSolutions[0]));
             return true;
         }
-    }
-     /** NEOXA END */
+    } 
+    /** NEOX ASSETS END */
     // Multisig txns have more than one address...
     return false;
 }
@@ -256,7 +255,7 @@ bool ExtractDestinations(const CScript& scriptPubKey, txnouttype& typeRet, std::
     std::vector<valtype> vSolutions;
     if (!Solver(scriptPubKey, typeRet, vSolutions))
         return false;
-    if (typeRet == TX_NULL_DATA) {
+    if (typeRet == TX_NULL_DATA){
         // This is data, not addresses
         return false;
     }
@@ -296,7 +295,7 @@ class CScriptVisitor : public boost::static_visitor<bool>
 private:
     CScript *script;
 public:
-    explicit CScriptVisitor(CScript *scriptin) { script = scriptin; }
+    CScriptVisitor(CScript *scriptin) { script = scriptin; }
 
     bool operator()(const CNoDestination &dest) const {
         script->clear();
@@ -314,6 +313,30 @@ public:
         *script << OP_HASH160 << ToByteVector(scriptID) << OP_EQUAL;
         return true;
     }
+};
+} // namespace
+
+namespace
+{
+class CScriptFutureVisitor : public boost::static_visitor<bool>
+{
+private:
+    CScript *script;
+    int height;
+public:
+    CScriptFutureVisitor(CScript *scriptin, int nHeight) { script = scriptin;  height = nHeight;}
+
+    bool operator()(const CNoDestination &dest) const {
+        script->clear();
+        return false;
+    }
+
+    bool operator()(const CKeyID &keyID) const {
+        script->clear();
+        *script << height << OP_CHECKSEQUENCEVERIFY << OP_DROP << ToByteVector(keyID) << OP_CHECKSIG;
+        return true;
+    }
+
 };
 } // namespace
 
@@ -345,19 +368,19 @@ namespace
     };
 } // namespace
 
+CScript GetFutureScriptForDestination(const CTxDestination& dest, int height)
+{
+    CScript script;
+
+    boost::apply_visitor(CScriptFutureVisitor(&script, height), dest);
+    return script;
+}
+
 CScript GetScriptForDestination(const CTxDestination& dest)
 {
     CScript script;
 
     boost::apply_visitor(CScriptVisitor(&script), dest);
-    return script;
-}
-
-CScript GetScriptForNullAssetDataDestination(const CTxDestination &dest)
-{
-    CScript script;
-
-    boost::apply_visitor(CNullAssetScriptVisitor(&script), dest);
     return script;
 }
 
@@ -374,6 +397,14 @@ CScript GetScriptForMultisig(int nRequired, const std::vector<CPubKey>& keys)
     for (const CPubKey& key : keys)
         script << ToByteVector(key);
     script << CScript::EncodeOP_N(keys.size()) << OP_CHECKMULTISIG;
+    return script;
+}
+
+CScript GetScriptForNullAssetDataDestination(const CTxDestination &dest)
+{
+    CScript script;
+
+    boost::apply_visitor(CNullAssetScriptVisitor(&script), dest);
     return script;
 }
 

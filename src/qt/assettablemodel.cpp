@@ -1,6 +1,5 @@
 // Copyright (c) 2011-2016 The Bitcoin Core developers
-// Copyright (c) 2017-2019 The Raven Core developers
-// Copyright (c) 2020-2021 The Neoxa Core developers
+// Copyright (c) 2017-2020 The Raven Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -174,9 +173,9 @@ QVariant AssetTableModel::data(const QModelIndex &index, int role) const
 
             QPixmap pixmap;
 
-            if (darkModeEnabled)
-                pixmap = QPixmap::fromImage(QImage(":/icons/external_link_dark"));
-            else
+            //if (darkModeEnabled)
+            //    pixmap = QPixmap::fromImage(QImage(":/icons/external_link_dark"));
+            //else
                 pixmap = QPixmap::fromImage(QImage(":/icons/external_link"));
 
             return pixmap;
@@ -191,9 +190,9 @@ QVariant AssetTableModel::data(const QModelIndex &index, int role) const
 
             QPixmap pixmap;
 
-            if (darkModeEnabled)
-                pixmap = QPixmap::fromImage(QImage(":/icons/asset_administrator_dark"));
-            else
+            //if (darkModeEnabled)
+            //    pixmap = QPixmap::fromImage(QImage(":/icons/asset_administrator_dark"));
+           // else
                 pixmap = QPixmap::fromImage(QImage(":/icons/asset_administrator"));
 
             return pixmap;

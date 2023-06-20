@@ -60,7 +60,7 @@ bool GenerateDistributionList(const CRewardSnapshot& p_rewardSnapshot, std::vect
 
     //  Get details on the specified source asset
     CNewAsset distributionAsset;
-    UNUSED_VAR bool srcIsIndivisible = false;
+    //UNUSED_VAR bool srcIsIndivisible = false;
     CAmount srcUnitDivisor = COIN;  //  Default to divisor for NEOX
     const int8_t COIN_DIGITS_PAST_DECIMAL = 8;
 
@@ -74,9 +74,9 @@ bool GenerateDistributionList(const CRewardSnapshot& p_rewardSnapshot, std::vect
         }
 
         //  If the token is indivisible, signal this to later code with a zero divisor
-        if (distributionAsset.units == 0) {
-            srcIsIndivisible = true;
-        }
+        //if (distributionAsset.units == 0) {
+        //    srcIsIndivisible = true;
+        //}
 
         srcUnitDivisor = static_cast<CAmount>(pow(10, distributionAsset.units));
 
@@ -124,7 +124,7 @@ bool GenerateDistributionList(const CRewardSnapshot& p_rewardSnapshot, std::vect
         //  Ignore exception and burn addresses
         if (
                 exceptionAddressSet.find(currPair.first) == exceptionAddressSet.end()
-                && !GetParams().IsBurnAddress(currPair.first)
+                && !Params().IsBurnAddress(currPair.first)
                 ) {
             //  Address is valid so add it to the payment list
             nonExceptionOwnerships.insert(OwnerAndAmount(currPair.first, currPair.second));

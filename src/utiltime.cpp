@@ -1,7 +1,5 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2016 The Bitcoin Core developers
-// Copyright (c) 2017-2019 The Raven Core developers
-// Copyright (c) 2020-2021 The Neoxa Core developers
+// Copyright (c) 2009-2015 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -9,6 +7,7 @@
 #include "config/neoxa-config.h"
 #endif
 
+#include "tinyformat.h"
 #include "utiltime.h"
 
 #include <atomic>
@@ -26,6 +25,12 @@ int64_t GetTime()
     time_t now = time(nullptr);
     assert(now > 0);
     return now;
+}
+
+int64_t GetMockableTimeMicros()
+{
+    if (nMockTime) return nMockTime * 1000000;
+    return GetTimeMicros();
 }
 
 void SetMockTime(int64_t nMockTimeIn)

@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
 # Copyright (c) 2014-2016 The Bitcoin Core developers
-# Copyright (c) 2017-2019 The Raven Core developers
-# Copyright (c) 2020-2021 The Neoxa Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-
 """Test node disconnect and ban behavior"""
 
-import time
-from test_framework.test_framework import NeoxaTestFramework
-from test_framework.util import assert_equal, assert_raises_rpc_error, connect_nodes_bi, wait_until
+from test_framework.test_framework import BitcoinTestFramework
+from test_framework.util import (
+    assert_equal,
+    assert_raises_rpc_error,
+    connect_nodes_bi,
+    wait_until,
+)
 
-class DisconnectBanTest(NeoxaTestFramework):
+class DisconnectBanTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 2
 
@@ -21,7 +22,7 @@ class DisconnectBanTest(NeoxaTestFramework):
         self.log.info("setban: successfully ban single IP address")
         assert_equal(len(self.nodes[1].getpeerinfo()), 2)  # node1 should have 2 connections to node0 at this point
         self.nodes[1].setban("127.0.0.1", "add")
-        wait_until(lambda: len(self.nodes[1].getpeerinfo()) == 0, err_msg="Wait until getPeerInfo", timeout=10)
+        wait_until(lambda: len(self.nodes[1].getpeerinfo()) == 0, timeout=10)
         assert_equal(len(self.nodes[1].getpeerinfo()), 0)  # all nodes must be disconnected at this point
         assert_equal(len(self.nodes[1].listbanned()), 1)
 
@@ -51,16 +52,12 @@ class DisconnectBanTest(NeoxaTestFramework):
         self.log.info("setban: test persistence across node restart")
         self.nodes[1].setban("127.0.0.0/32", "add")
         self.nodes[1].setban("127.0.0.0/24", "add")
-        # Set the mocktime so we can control when bans expire
-        old_time = int(time.time())
-        self.nodes[1].setmocktime(old_time)
         self.nodes[1].setban("192.168.0.1", "add", 1)  # ban for 1 seconds
         self.nodes[1].setban("2001:4d48:ac57:400:cacf:e9ff:fe1d:9c63/19", "add", 1000)  # ban for 1000 seconds
         listBeforeShutdown = self.nodes[1].listbanned()
         assert_equal("192.168.0.1/32", listBeforeShutdown[2]['address'])
-        # Move time forward by 3 seconds so the third ban has expired
-        self.nodes[1].setmocktime(old_time + 3)
-        assert_equal(len(self.nodes[1].listbanned()), 3)
+        self.bump_mocktime(2)
+        wait_until(lambda: len(self.nodes[1].listbanned()) == 3, timeout=10)
 
         self.stop_node(1)
         self.start_node(1)
@@ -87,7 +84,7 @@ class DisconnectBanTest(NeoxaTestFramework):
         self.log.info("disconnectnode: successfully disconnect node by address")
         address1 = self.nodes[0].getpeerinfo()[0]['addr']
         self.nodes[0].disconnectnode(address=address1)
-        wait_until(lambda: len(self.nodes[0].getpeerinfo()) == 1, err_msg="Wait until getPeerInfo", timeout=10)
+        wait_until(lambda: len(self.nodes[0].getpeerinfo()) == 1, timeout=10)
         assert not [node for node in self.nodes[0].getpeerinfo() if node['addr'] == address1]
 
         self.log.info("disconnectnode: successfully reconnect node")
@@ -98,7 +95,7 @@ class DisconnectBanTest(NeoxaTestFramework):
         self.log.info("disconnectnode: successfully disconnect node by node id")
         id1 = self.nodes[0].getpeerinfo()[0]['id']
         self.nodes[0].disconnectnode(nodeid=id1)
-        wait_until(lambda: len(self.nodes[0].getpeerinfo()) == 1, err_msg="Wait until getPeerInfo", timeout=10)
+        wait_until(lambda: len(self.nodes[0].getpeerinfo()) == 1, timeout=10)
         assert not [node for node in self.nodes[0].getpeerinfo() if node['id'] == id1]
 
 if __name__ == '__main__':

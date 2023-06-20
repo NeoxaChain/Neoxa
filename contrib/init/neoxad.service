@@ -3,13 +3,13 @@ Description=Neoxa's distributed currency daemon
 After=network.target
 
 [Service]
-User=neoxa
-Group=neoxa
+User=neoxacore
+Group=neoxacore
 
 Type=forking
 PIDFile=/var/lib/neoxad/neoxad.pid
 ExecStart=/usr/bin/neoxad -daemon -pid=/var/lib/neoxad/neoxad.pid \
--conf=/etc/neoxa/neoxa.conf -datadir=/var/lib/neoxad -disablewallet
+-conf=/etc/neoxacore/neoxa.conf -datadir=/var/lib/neoxad -disablewallet
 
 Restart=always
 PrivateTmp=true

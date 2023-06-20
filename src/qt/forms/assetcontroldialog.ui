@@ -509,7 +509,7 @@
   <customwidget>
    <class>AssetControlTreeWidget</class>
    <extends>QTreeWidget</extends>
-   <header location="global">assetcontroltreewidget.h</header>
+   <header location="global">qt/assetcontroltreewidget.h</header>
   </customwidget>
  </customwidgets>
  <resources/>

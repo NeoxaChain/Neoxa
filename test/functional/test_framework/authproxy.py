@@ -1,8 +1,8 @@
 # Copyright (c) 2011 Jeff Garzik
+#
 # Previous copyright, from python-jsonrpc/jsonrpc/proxy.py:
+#
 # Copyright (c) 2007 Jan-Klaas Kollhof
-# Copyright (c) 2017-2019 The Raven Core developers
-# Copyright (c) 2020-2021 The Neoxa Core developers
 #
 # This file is part of jsonrpc.
 #
@@ -19,9 +19,7 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with this software; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-
-"""
-HTTP proxy for opening RPC connection to neoxad.
+"""HTTP proxy for opening RPC connection to neoxad.
 
 AuthServiceProxy has the following improvements over python-jsonrpc's
 ServiceProxy class:
@@ -37,11 +35,9 @@ ServiceProxy class:
 
 import base64
 import decimal
-from http import HTTPStatus
 import http.client
 import json
 import logging
-import os
 import socket
 import time
 import urllib.parse
@@ -49,27 +45,24 @@ import urllib.parse
 HTTP_TIMEOUT = 30
 USER_AGENT = "AuthServiceProxy/0.1"
 
-log = logging.getLogger("NeoxaRPC")
-
+log = logging.getLogger("BitcoinRPC")
 
 class JSONRPCException(Exception):
-    def __init__(self, rpc_error, http_status=None):
+    def __init__(self, rpc_error):
         try:
             errmsg = '%(message)s (%(code)i)' % rpc_error
         except (KeyError, TypeError):
             errmsg = ''
         super().__init__(errmsg)
         self.error = rpc_error
-        self.http_status = http_status
 
 
-def encode_decimal(o):
+def EncodeDecimal(o):
     if isinstance(o, decimal.Decimal):
         return str(o)
     raise TypeError(repr(o) + " is not JSON serializable")
 
-
-class AuthServiceProxy:
+class AuthServiceProxy():
     __id_count = 0
 
     # ensure_ascii: escape unicode as \uXXXX, passed to json.dumps
@@ -78,12 +71,19 @@ class AuthServiceProxy:
         self._service_name = service_name
         self.ensure_ascii = ensure_ascii  # can be toggled on the fly by tests
         self.__url = urllib.parse.urlparse(service_url)
+        port = 80 if self.__url.port is None else self.__url.port
         user = None if self.__url.username is None else self.__url.username.encode('utf8')
         passwd = None if self.__url.password is None else self.__url.password.encode('utf8')
-        auth_pair = user + b':' + passwd
-        self.__auth_header = b'Basic ' + base64.b64encode(auth_pair)
-        self.timeout = timeout
-        self._set_conn(connection)
+        authpair = user + b':' + passwd
+        self.__auth_header = b'Basic ' + base64.b64encode(authpair)
+
+        if connection:
+            # Callables re-use the connection of the original proxy
+            self.__conn = connection
+        elif self.__url.scheme == 'https':
+            self.__conn = http.client.HTTPSConnection(self.__url.hostname, port, timeout=timeout)
+        else:
+            self.__conn = http.client.HTTPConnection(self.__url.hostname, port, timeout=timeout)
 
     def __getattr__(self, name):
         if name.startswith('__') and name.endswith('__'):
@@ -93,44 +93,37 @@ class AuthServiceProxy:
             name = "%s.%s" % (self._service_name, name)
         return AuthServiceProxy(self.__service_url, name, connection=self.__conn)
 
-    def _request(self, method, path, post_data):
-        """
+    def _request(self, method, path, postdata):
+        '''
         Do a HTTP request, with retry if we get disconnected (e.g. due to a timeout).
         This is a workaround for https://bugs.python.org/issue3566 which is fixed in Python 3.5.
-        """
+        '''
         headers = {'Host': self.__url.hostname,
                    'User-Agent': USER_AGENT,
                    'Authorization': self.__auth_header,
                    'Content-type': 'application/json'}
-        if os.name == 'nt':
-            # Windows somehow does not like to re-use connections
-            # TODO: Find out why the connection would disconnect occasionally and make it reusable on Windows
-            self._set_conn()
         try:
-            self.__conn.request(method, path, post_data, headers)
+            self.__conn.request(method, path, postdata, headers)
             return self._get_response()
         except http.client.BadStatusLine as e:
             if e.line == "''":  # if connection was closed, try again
                 self.__conn.close()
-                self.__conn.request(method, path, post_data, headers)
-                print("~~~~~~~~~~~~~~~~~ Bad Status Exception ~~~~~~~~~~~~~~~~~~~~~~~~~~")
-                print(e)
+                self.__conn.request(method, path, postdata, headers)
                 return self._get_response()
             else:
                 raise
-        except (BrokenPipeError, ConnectionResetError) as e:
+        except (BrokenPipeError, ConnectionResetError):
             # Python 3.5+ raises BrokenPipeError instead of BadStatusLine when the connection was reset
             # ConnectionResetError happens on FreeBSD with Python 3.4
             self.__conn.close()
-            self.__conn.request(method, path, post_data, headers)
-            print("~~~~~~~~~~~~~~~~~ Broken Pipe or Connection Reset Exception ~~~~~~~~~~~~~~~~~~~~~~~~~~")
-            print(e)
+            self.__conn.request(method, path, postdata, headers)
             return self._get_response()
 
     def get_request(self, *args, **argsn):
         AuthServiceProxy.__id_count += 1
 
-        log.debug("-{}-> {} {}".format(AuthServiceProxy.__id_count, self._service_name, json.dumps(args or argsn, default=encode_decimal, ensure_ascii=self.ensure_ascii),))
+        log.debug("-%s-> %s %s" % (AuthServiceProxy.__id_count, self._service_name,
+                                   json.dumps(args, default=EncodeDecimal, ensure_ascii=self.ensure_ascii)))
         if args and argsn:
             raise ValueError('Cannot handle both named and positional arguments')
         return {'version': '1.1',
@@ -139,28 +132,20 @@ class AuthServiceProxy:
                 'id': AuthServiceProxy.__id_count}
 
     def __call__(self, *args, **argsn):
-        post_data = json.dumps(self.get_request(*args, **argsn), default=encode_decimal, ensure_ascii=self.ensure_ascii)
-        response, status = self._request('POST', self.__url.path, post_data.encode('utf-8'))
+        postdata = json.dumps(self.get_request(*args, **argsn), default=EncodeDecimal, ensure_ascii=self.ensure_ascii)
+        response = self._request('POST', self.__url.path, postdata.encode('utf-8'))
         if response['error'] is not None:
-            log.debug("---------------------------<authproxy>---------------------------")
-            log.debug("Call failed!  postdata:")
-            log.debug(post_data)
-            log.debug("---------------------------</authproxy>--------------------------")
-            raise JSONRPCException(response['error'], status)
+            raise JSONRPCException(response['error'])
         elif 'result' not in response:
-            raise JSONRPCException({'code': -343, 'message': 'missing JSON-RPC result'}, status)
-        elif status != HTTPStatus.OK:
-            raise JSONRPCException({'code': -342, 'message': 'non-200 HTTP status code but no JSON-RPC error'}, status)
+            raise JSONRPCException({
+                'code': -343, 'message': 'missing JSON-RPC result'})
         else:
             return response['result']
 
     def batch(self, rpc_call_list):
-        postdata = json.dumps(list(rpc_call_list), default=encode_decimal, ensure_ascii=self.ensure_ascii)
+        postdata = json.dumps(list(rpc_call_list), default=EncodeDecimal, ensure_ascii=self.ensure_ascii)
         log.debug("--> " + postdata)
-        response, status = self._request('POST', self.__url.path, postdata.encode('utf-8'))
-        if status != HTTPStatus.OK:
-            raise JSONRPCException({'code': -342, 'message': 'non-200 HTTP status code but no JSON-RPC error'}, status)
-        return response
+        return self._request('POST', self.__url.path, postdata.encode('utf-8'))
 
     def _get_response(self):
         req_start_time = time.time()
@@ -171,32 +156,25 @@ class AuthServiceProxy:
                 'code': -344,
                 'message': '%r RPC took longer than %f seconds. Consider '
                            'using larger timeout for calls that take '
-                           'longer to return.' % (self._service_name, self.__conn.timeout)})
+                           'longer to return.' % (self._service_name,
+                                                  self.__conn.timeout)})
         if http_response is None:
-            raise JSONRPCException({'code': -342, 'message': 'missing HTTP response from server'})
+            raise JSONRPCException({
+                'code': -342, 'message': 'missing HTTP response from server'})
 
         content_type = http_response.getheader('Content-Type')
         if content_type != 'application/json':
-            raise JSONRPCException({'code': -342, 'message': 'non-JSON HTTP response with \'%i %s\' from server' % (http_response.status, http_response.reason)}, http_response.status)
+            raise JSONRPCException({
+                'code': -342, 'message': 'non-JSON HTTP response with \'%i %s\' from server' % (http_response.status, http_response.reason)})
 
-        response_data = http_response.read().decode('utf8')
-        response = json.loads(response_data, parse_float=decimal.Decimal)
+        responsedata = http_response.read().decode('utf8')
+        response = json.loads(responsedata, parse_float=decimal.Decimal)
         elapsed = time.time() - req_start_time
         if "error" in response and response["error"] is None:
-            log.debug("<-%s- [%.6f] %s" % (response["id"], elapsed, json.dumps(response["result"], default=encode_decimal, ensure_ascii=self.ensure_ascii)))
+            log.debug("<-%s- [%.6f] %s" % (response["id"], elapsed, json.dumps(response["result"], default=EncodeDecimal, ensure_ascii=self.ensure_ascii)))
         else:
-            log.debug("<-- [%.6f] %s" % (elapsed, response_data))
-        return response, http_response.status
+            log.debug("<-- [%.6f] %s" % (elapsed, responsedata))
+        return response
 
     def __truediv__(self, relative_uri):
         return AuthServiceProxy("{}/{}".format(self.__service_url, relative_uri), self._service_name, connection=self.__conn)
-
-    def _set_conn(self, connection=None):
-        port = 80 if self.__url.port is None else self.__url.port
-        if connection:
-            self.__conn = connection
-            self.timeout = connection.timeout
-        elif self.__url.scheme == 'https':
-            self.__conn = http.client.HTTPSConnection(self.__url.hostname, port, timeout=self.timeout)
-        else:
-            self.__conn = http.client.HTTPConnection(self.__url.hostname, port, timeout=self.timeout)

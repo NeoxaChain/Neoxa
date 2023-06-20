@@ -1,14 +1,11 @@
-// Copyright (c) 2011-2016 The Bitcoin Core developers
-// Copyright (c) 2017-2019 The Raven Core developers
-// Copyright (c) 2020-2021 The Neoxa Core developers
+// Copyright (c) 2011-2015 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "qvalidatedlineedit.h"
 
-#include "neoxaaddressvalidator.h"
-#include "guiconstants.h"
-#include "platformstyle.h"
+#include "bitcoinaddressvalidator.h"
+#include "guiutil.h"
 
 QValidatedLineEdit::QValidatedLineEdit(QWidget *parent) :
     QLineEdit(parent),
@@ -27,14 +24,11 @@ void QValidatedLineEdit::setValid(bool _valid)
 
     if(_valid)
     {
-        if (darkModeEnabled)
-            setStyleSheet("");
-        else
-            setStyleSheet(STYLE_VALID);
+        setStyleSheet("");
     }
     else
     {
-        setStyleSheet(STYLE_INVALID);
+        setStyleSheet(GUIUtil::getThemedStyleQString(GUIUtil::ThemedStyle::TS_INVALID));
     }
     this->valid = _valid;
 }

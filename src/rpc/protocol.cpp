@@ -1,7 +1,7 @@
 // Copyright (c) 2010 Satoshi Nakamoto
-// Copyright (c) 2009-2016 The Bitcoin Core developers
-// Copyright (c) 2017-2019 The Raven Core developers
-// Copyright (c) 2020-2021 The Neoxa Core developers
+// Copyright (c) 2009-2015 The Bitcoin Core developers
+// Copyright (c) 2014-2020 The Dash Core developers
+// Copyright (c) 2020 The Neoxa developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -18,10 +18,10 @@
 #include <fstream>
 
 /**
- * JSON-RPC protocol.  Neoxa speaks version 1.0 for maximum compatibility,
+ * JSON-RPC protocol.  Bitcoin speaks version 1.0 for maximum compatibility,
  * but uses JSON-RPC 1.1/2.0 standards for parts of the 1.0 standard that were
  * unspecified (HTTP errors and contents of 'error').
- *
+ * 
  * 1.0 spec: http://json-rpc.org/wiki/specification
  * 1.2 spec: http://jsonrpc.org/historical/json-rpc-over-http.html
  */
@@ -85,6 +85,7 @@ bool GenerateAuthCookie(std::string *cookie_out)
     const size_t COOKIE_SIZE = 32;
     unsigned char rand_pwd[COOKIE_SIZE];
     GetRandBytes(rand_pwd, COOKIE_SIZE);
+
     std::string cookie = COOKIEAUTH_USER + ":" + HexStr(rand_pwd, rand_pwd+COOKIE_SIZE);
 
     /** the umask determines what permissions are used to create this file -
@@ -137,22 +138,3 @@ void DeleteAuthCookie()
     }
 }
 
-std::vector<UniValue> JSONRPCProcessBatchReply(const UniValue &in, size_t num)
-{
-    if (!in.isArray()) {
-        throw std::runtime_error("Batch must be an array");
-    }
-    std::vector<UniValue> batch(num);
-    for (size_t i=0; i<in.size(); ++i) {
-        const UniValue &rec = in[i];
-        if (!rec.isObject()) {
-            throw std::runtime_error("Batch member must be object");
-        }
-        size_t id = rec["id"].get_int();
-        if (id >= num) {
-            throw std::runtime_error("Batch member id larger than size");
-        }
-        batch[id] = rec;
-    }
-    return batch;
-}

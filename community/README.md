@@ -1,2 +1,0 @@
-# Neoxa - Community Ideas
-

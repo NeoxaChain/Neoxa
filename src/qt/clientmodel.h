@@ -1,11 +1,14 @@
-// Copyright (c) 2011-2016 The Bitcoin Core developers
-// Copyright (c) 2017-2019 The Raven Core developers
-// Copyright (c) 2020-2021 The Neoxa Core developers
+// Copyright (c) 2011-2015 The Bitcoin Core developers
+// Copyright (c) 2014-2019 The Dash Core developers
+// Copyright (c) 2020 The Neoxa developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef NEOXA_QT_CLIENTMODEL_H
-#define NEOXA_QT_CLIENTMODEL_H
+#ifndef BITCOIN_QT_CLIENTMODEL_H
+#define BITCOIN_QT_CLIENTMODEL_H
+
+#include "evo/deterministicmns.h"
+#include "sync.h"
 
 #include <QObject>
 #include <QDateTime>
@@ -36,7 +39,7 @@ enum NumConnections {
     CONNECTIONS_ALL  = (CONNECTIONS_IN | CONNECTIONS_OUT),
 };
 
-/** Model for neoxa network client. */
+/** Model for Neoxa network client. */
 class ClientModel : public QObject
 {
     Q_OBJECT
@@ -58,7 +61,13 @@ public:
     long getMempoolSize() const;
     //! Return the dynamic memory usage of the mempool
     size_t getMempoolDynamicUsage() const;
-    
+    //! Return number of ISLOCKs
+    size_t getInstantSentLockCount() const;
+
+    void setSmartnodeList(const CDeterministicMNList& mnList);
+    CDeterministicMNList getSmartnodeList() const;
+    void refreshSmartnodeList();
+
     quint64 getTotalBytesRecv() const;
     quint64 getTotalBytesSent() const;
 
@@ -93,13 +102,22 @@ private:
 
     QTimer *pollTimer;
 
+    // The cache for mn list is not technically needed because CDeterministicMNManager
+    // caches it internally for recent blocks but it's not enough to get consistent
+    // representation of the list in UI during initial sync/reindex, so we cache it here too.
+    mutable CCriticalSection cs_mnlinst; // protects mnListCached
+    CDeterministicMNList mnListCached;
+
     void subscribeToCoreSignals();
     void unsubscribeFromCoreSignals();
 
 Q_SIGNALS:
     void numConnectionsChanged(int count);
+    void smartnodeListChanged() const;
     void numBlocksChanged(int count, const QDateTime& blockDate, double nVerificationProgress, bool header);
+    void additionalDataSyncProgressChanged(double nSyncProgress);
     void mempoolSizeChanged(long count, size_t mempoolSizeInBytes);
+    void islockCountChanged(size_t count);
     void networkActiveChanged(bool networkActive);
     void alertsChanged(const QString &warnings);
     void bytesChanged(quint64 totalBytesIn, quint64 totalBytesOut);
@@ -118,4 +136,4 @@ public Q_SLOTS:
     void updateBanlist();
 };
 
-#endif // NEOXA_QT_CLIENTMODEL_H
+#endif // BITCOIN_QT_CLIENTMODEL_H

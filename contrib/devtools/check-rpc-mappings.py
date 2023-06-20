@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 # Copyright (c) 2017 The Bitcoin Core developers
-# Copyright (c) 2017-2019 The Raven Core developers
-# Copyright (c) 2020-2021 The Neoxa Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """Check RPC argument consistency."""
@@ -15,10 +13,15 @@ import sys
 SOURCES = [
     "src/rpc/server.cpp",
     "src/rpc/blockchain.cpp",
+    "src/rpc/governance.cpp",
+    "src/rpc/smartnode.cpp",
     "src/rpc/mining.cpp",
     "src/rpc/misc.cpp",
     "src/rpc/net.cpp",
+    "src/rpc/privatesend.cpp",
     "src/rpc/rawtransaction.cpp",
+    "src/rpc/rpcevo.cpp",
+    "src/rpc/rpcquorums.cpp",
     "src/wallet/rpcwallet.cpp",
 ]
 # Source file (relative to root) containing conversion mapping

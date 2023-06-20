@@ -1,6 +1,6 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
-#  neoxad The neoxa core server.
+#  neoxad The Neoxa Core server.
 #
 #
 # chkconfig: 345 80 20
@@ -19,14 +19,14 @@ fi
 RETVAL=0
 
 prog=neoxad
-# you can override the lockfile via NEOXAD_LOCKFILE in /etc/sysconfig/neoxad
-lockfile=${NEOXAD_LOCKFILE-/var/lock/subsys/neoxad}
+# you can override the lockfile via BITCOIND_LOCKFILE in /etc/sysconfig/neoxad
+lockfile=${BITCOIND_LOCKFILE-/var/lock/subsys/neoxad}
 
-# neoxad defaults to /usr/bin/neoxad, override with NEOXAD_BIN
-neoxad=${NEOXAD_BIN-/usr/bin/neoxad}
+# neoxad defaults to /usr/bin/neoxad, override with BITCOIND_BIN
+neoxad=${BITCOIND_BIN-/usr/bin/neoxad}
 
-# neoxad opts default to -disablewallet, override with NEOXAD_OPTS
-neoxad_opts=${NEOXAD_OPTS--disablewallet}
+# neoxad opts default to -disablewallet, override with BITCOIND_OPTS
+neoxad_opts=${BITCOIND_OPTS--disablewallet}
 
 start() {
     echo -n $"Starting $prog: "

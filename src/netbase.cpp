@@ -1,7 +1,5 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2016 The Bitcoin Core developers
-// Copyright (c) 2017-2019 The Raven Core developers
-// Copyright (c) 2020-2021 The Neoxa Core developers
+// Copyright (c) 2009-2015 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -27,7 +25,7 @@
 #include <boost/algorithm/string/case_conv.hpp> // for to_lower()
 #include <boost/algorithm/string/predicate.hpp> // for startswith() and endswith()
 
-#if !defined(HAVE_MSG_NOSIGNAL)
+#if !defined(MSG_NOSIGNAL)
 #define MSG_NOSIGNAL 0
 #endif
 
@@ -194,10 +192,10 @@ enum SOCKSVersion: uint8_t {
 
 /** Values defined for METHOD in RFC1928 */
 enum SOCKS5Method: uint8_t {
-    NOAUTH = 0x00,        //!< No authentication required
-    GSSAPI = 0x01,        //!< GSSAPI
-    USER_PASS = 0x02,     //!< Username/password
-    NO_ACCEPTABLE = 0xff, //!< No acceptable methods
+    NOAUTH = 0x00,        //! No authentication required
+    GSSAPI = 0x01,        //! GSSAPI
+    USER_PASS = 0x02,     //! Username/password
+    NO_ACCEPTABLE = 0xff, //! No acceptable methods
 };
 
 /** Values defined for CMD in RFC1928 */
@@ -209,15 +207,15 @@ enum SOCKS5Command: uint8_t {
 
 /** Values defined for REP in RFC1928 */
 enum SOCKS5Reply: uint8_t {
-    SUCCEEDED = 0x00,        //!< Succeeded
-    GENFAILURE = 0x01,       //!< General failure
-    NOTALLOWED = 0x02,       //!< Connection not allowed by ruleset
-    NETUNREACHABLE = 0x03,   //!< Network unreachable
-    HOSTUNREACHABLE = 0x04,  //!< Network unreachable
-    CONNREFUSED = 0x05,      //!< Connection refused
-    TTLEXPIRED = 0x06,       //!< TTL expired
-    CMDUNSUPPORTED = 0x07,   //!< Command not supported
-    ATYPEUNSUPPORTED = 0x08, //!< Address type not supported
+    SUCCEEDED = 0x00,        //! Succeeded
+    GENFAILURE = 0x01,       //! General failure
+    NOTALLOWED = 0x02,       //! Connection not allowed by ruleset
+    NETUNREACHABLE = 0x03,   //! Network unreachable
+    HOSTUNREACHABLE = 0x04,  //! Network unreachable
+    CONNREFUSED = 0x05,      //! Connection refused
+    TTLEXPIRED = 0x06,       //! TTL expired
+    CMDUNSUPPORTED = 0x07,   //! Command not supported
+    ATYPEUNSUPPORTED = 0x08, //! Address type not supported
 };
 
 /** Values defined for ATYPE in RFC1928 */
@@ -293,7 +291,7 @@ struct ProxyCredentials
     std::string password;
 };
 
-/** Convert SOCKS5 reply to an error message */
+/** Convert SOCKS5 reply to a an error message */
 std::string Socks5ErrorString(uint8_t err)
 {
     switch(err) {
@@ -454,7 +452,7 @@ static bool Socks5(const std::string& strDest, int port, const ProxyCredentials 
     return true;
 }
 
-bool ConnectSocketDirectly(const CService &addrConnect, SOCKET& hSocketRet, int nTimeout)
+bool static ConnectSocketDirectly(const CService &addrConnect, SOCKET& hSocketRet, int nTimeout)
 {
     hSocketRet = INVALID_SOCKET;
 
@@ -589,7 +587,7 @@ bool IsProxy(const CNetAddr &addr) {
     return false;
 }
 
-bool ConnectThroughProxy(const proxyType &proxy, const std::string& strDest, int port, SOCKET& hSocketRet, int nTimeout, bool *outProxyConnectionFailed)
+static bool ConnectThroughProxy(const proxyType &proxy, const std::string& strDest, int port, SOCKET& hSocketRet, int nTimeout, bool *outProxyConnectionFailed)
 {
     SOCKET hSocket = INVALID_SOCKET;
     // first connect to proxy server
@@ -613,6 +611,47 @@ bool ConnectThroughProxy(const proxyType &proxy, const std::string& strDest, int
     hSocketRet = hSocket;
     return true;
 }
+
+bool ConnectSocket(const CService &addrDest, SOCKET& hSocketRet, int nTimeout, bool *outProxyConnectionFailed)
+{
+    proxyType proxy;
+    if (outProxyConnectionFailed)
+        *outProxyConnectionFailed = false;
+
+    if (GetProxy(addrDest.GetNetwork(), proxy))
+        return ConnectThroughProxy(proxy, addrDest.ToStringIP(), addrDest.GetPort(), hSocketRet, nTimeout, outProxyConnectionFailed);
+    else // no proxy needed (none set for target network)
+        return ConnectSocketDirectly(addrDest, hSocketRet, nTimeout);
+}
+
+bool ConnectSocketByName(CService &addr, SOCKET& hSocketRet, const char *pszDest, int portDefault, int nTimeout, bool *outProxyConnectionFailed)
+{
+    std::string strDest;
+    int port = portDefault;
+
+    if (outProxyConnectionFailed)
+        *outProxyConnectionFailed = false;
+
+    SplitHostPort(std::string(pszDest), port, strDest);
+
+    proxyType proxy;
+    GetNameProxy(proxy);
+
+    std::vector<CService> addrResolved;
+    if (Lookup(strDest.c_str(), addrResolved, port, fNameLookup && !HaveNameProxy(), 256)) {
+        if (addrResolved.size() > 0) {
+            addr = addrResolved[GetRand(addrResolved.size())];
+            return ConnectSocket(addr, hSocketRet, nTimeout);
+        }
+    }
+
+    addr = CService();
+
+    if (!HaveNameProxy())
+        return false;
+    return ConnectThroughProxy(proxy, strDest, port, hSocketRet, nTimeout, outProxyConnectionFailed);
+}
+
 bool LookupSubNet(const char* pszName, CSubNet& ret)
 {
     std::string strSubnet(pszName);

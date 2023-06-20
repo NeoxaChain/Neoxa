@@ -1,4 +1,4 @@
-Deterministic OS X Dmg Notes.
+Deterministic OS X DMG Notes.
 
 Working OS X DMGs are created in Linux by combining a recent clang,
 the Apple binutils (ld, ar, etc) and DMG authoring tools.
@@ -92,6 +92,6 @@ build process to remain somewhat deterministic. Here's how it works:
   that have been previously (deterministically) built in order to create a
   final dmg.
 - The Apple keyholder uses this unsigned app to create a detached signature,
-  using the script that is also included there. Detached signatures are available from this [repository](https://github.com/neoxa-core/neoxa-detached-sigs).
+  using the script that is also included there. Detached signatures are available from this [repository](https://github.com/bitcoin-core/bitcoin-detached-sigs).
 - Builders feed the unsigned app + detached signature back into Gitian. It
   uses the pre-built tools to recombine the pieces into a deterministic dmg.

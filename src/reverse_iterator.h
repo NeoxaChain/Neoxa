@@ -1,7 +1,7 @@
 // Taken from https://gist.github.com/arvidsson/7231973
 
-#ifndef NEOXA_REVERSE_ITERATOR_H
-#define NEOXA_REVERSE_ITERATOR_H
+#ifndef BITCOIN_REVERSE_ITERATOR_H
+#define BITCOIN_REVERSE_ITERATOR_H
 
 /**
  * Template used for reverse iteration in C++11 range-based for loops.
@@ -17,7 +17,7 @@ class reverse_range
     T &m_x;
     
 public:
-    explicit reverse_range(T &x) : m_x(x) {}
+    reverse_range(T &x) : m_x(x) {}
     
     auto begin() const -> decltype(this->m_x.rbegin())
     {
@@ -36,4 +36,4 @@ reverse_range<T> reverse_iterate(T &x)
     return reverse_range<T>(x);
 }
 
-#endif // NEOXA_REVERSE_ITERATOR_H
+#endif // BITCOIN_REVERSE_ITERATOR_H
