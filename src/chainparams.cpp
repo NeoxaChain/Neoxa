@@ -372,7 +372,7 @@ public:
         consensus.BIP65Enabled = true; // 00000000000076d8fcea02ec0963de4abfd01e771fec0863f960c2c64fe6f357
         consensus.BIP66Enabled = true; // 00000000000b1fa2dfa312863570e13fae9ca7b5566cb27e55422620b469aefa
         consensus.nSegwitEnabled = true;
-        consensus.DIP0003Height = 9999999;
+        consensus.DIP0003Height = 620000;
         consensus.DIP0008Enabled = false;
        // consensus.DIP0003EnforcementHeight = 1047200;
         consensus.powLimit = uint256S("00ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"); // ~uint256(0) >> 20
@@ -384,8 +384,8 @@ public:
         consensus.DGWBlocksAvg = 60;
         consensus.nRuleChangeActivationThreshold = 1916; // 95% of 2016
         consensus.nMinerConfirmationWindow = 2016; // nPowTargetTimespan / nPowTargetSpacing
-        consensus.smartnodePaymentFixedBlock = 6800;
-        consensus.nAssetsForkBlock = 229420;
+        consensus.smartnodePaymentFixedBlock = 620000;
+        consensus.nAssetsForkBlock = 1;
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit = 28;
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime = 1653004800; // January 1, 2008
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout = 1653264000; // December 31, 2008
@@ -460,11 +460,11 @@ public:
         // NEOXA BIP44 cointype in mainnet is '1668'
         nExtCoinType = 1668;
 
-        vector<FounderRewardStructure> rewardStructures = { {9999999,15},// 15%
+        vector<FounderRewardStructure> rewardStructures = { {620000, 15},// 15%
                                                             {INT_MAX, 10}// 10% founder/dev fee forever
                                                             };
         consensus.nFounderPayment = FounderPayment(rewardStructures, 1);
-        consensus.nAssetsRewardShare = Consensus::AssetsRewardShare(0.8,0.2,0.0);
+        consensus.nSpecialRewardShare = Consensus::SpecialRewardShare(0.8,0.2,0.0);
         consensus.nCollaterals = SmartnodeCollaterals(
           { 
             {INT_MAX, 1000000 * COIN}
@@ -508,7 +508,8 @@ public:
                 {20000, uint256S("0000000000e244579b5e0a2622db902bba222022577aff23169506893bb18fc2")},
                 {28862, uint256S("000000000032b28e62977a388f241c3119a00e375471b84569995d1e29a63e0b")},
                 {35900, uint256S("00000000006fa70f70804bc376871d1a75a6b120b32948f0c97b6cb69f05c0ec")},
-                {157581, uint256S("0000000000008ea299bed393aaeedcdac66baf26c7228c60636fa432addc4777")}  
+                {157581, uint256S("0000000000008ea299bed393aaeedcdac66baf26c7228c60636fa432addc4777")},
+                {568654, uint256S("00000000000455f159bd9ab7d027ef7f0edec468a903670ab6e2ea2351f355b6")}  
             }
 	    };
 
@@ -549,8 +550,6 @@ public:
         nAssetActivationHeight = 1; // Asset activated block height
         nMessagingActivationBlock = 1; // Messaging activated block height
         nRestrictedActivationBlock = 1; // Restricted activated block height
-
-        nKAWPOWActivationTime = 1651444217;
     }
 };
 
@@ -691,7 +690,7 @@ public:
                                                              {INT_MAX, 10}// 10% founder/dev fee forever
                                                 										   };
 		consensus.nFounderPayment = FounderPayment(rewardStructures, 0, "J8db9nuaVL3Jo8hDcfKh77pZnG2J8jvxWH");
-        consensus.nAssetsRewardShare = Consensus::AssetsRewardShare(0.8,0.2,0.0);
+        consensus.nSpecialRewardShare = Consensus::SpecialRewardShare(0.8,0.2,0.0);
 
         fDefaultConsistencyChecks = false;
         fRequireStandard = false;
@@ -754,8 +753,6 @@ public:
         nAssetActivationHeight = 1; // Asset activated block height
         nMessagingActivationBlock = 1; // Messaging activated block height
         nRestrictedActivationBlock = 1; // Restricted activated block height
-
-        nKAWPOWActivationTime = 1653247613;
         /** NEOXA End **/
     }
 };
@@ -824,7 +821,7 @@ public:
         vector<FounderRewardStructure> rewardStructures = {  {INT_MAX, 5}// 5% founder/dev fee forever
                                                                 										   };
 		consensus.nFounderPayment = FounderPayment(rewardStructures, 200);
-        consensus.nAssetsRewardShare = Consensus::AssetsRewardShare(0.8,0.2,0.0);
+        consensus.nSpecialRewardShare = Consensus::SpecialRewardShare(0.8,0.2,0.0);
 
         vFixedSeeds.clear();
         vSeeds.clear();
@@ -875,8 +872,6 @@ public:
         chainTxData = ChainTxData{
 
         };
-
-        nKAWPOWActivationTime = 1651444217;
     }
 };
 
@@ -971,7 +966,7 @@ public:
                                                             {INT_MAX, 10}// 10% founder/dev fee forever
                                                      										   };
         consensus.nFounderPayment = FounderPayment(rewardStructures, 500, "yaackz5YDLnFuuX6gGzEs9EMRQGfqmNYjc");
-        consensus.nAssetsRewardShare = Consensus::AssetsRewardShare(0.8,0.2,0.0);
+        consensus.nSpecialRewardShare = Consensus::SpecialRewardShare(0.8,0.2,0.0);
 
         checkpointData = (CCheckpointData) {
             {
@@ -1005,8 +1000,6 @@ public:
         consensus.llmqs[Consensus::LLMQ_400_85] = llmq20_85;
         consensus.llmqTypeChainLocks = Consensus::LLMQ_400_60;
         consensus.llmqTypeInstantSend = Consensus::LLMQ_50_60;
-
-        nKAWPOWActivationTime = 1651444217;
     }
 };
 

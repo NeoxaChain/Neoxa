@@ -90,10 +90,10 @@ CDKGSessionHandler::CDKGSessionHandler(const Consensus::LLMQParams& _params, ctp
     blsWorker(_blsWorker),
     dkgManager(_dkgManager),
     curSession(std::make_shared<CDKGSession>(_params, _blsWorker, _dkgManager)),
-    pendingContributions((size_t)_params.size * 2), // we allow size*2 messages as we need to make sure we see bad behavior (double messages)
-    pendingComplaints((size_t)_params.size * 2),
-    pendingJustifications((size_t)_params.size * 2),
-    pendingPrematureCommitments((size_t)_params.size * 2)
+    pendingContributions(800), // we allow size*2 messages as we need to make sure we see bad behavior (double messages)
+    pendingComplaints(800),
+    pendingJustifications(800),
+    pendingPrematureCommitments(800)
 {
     phaseHandlerThread = std::thread([this] {
         RenameThread(strprintf("neoxa-q-phase-%d", (uint8_t)params.type).c_str());

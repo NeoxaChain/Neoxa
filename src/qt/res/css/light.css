@@ -24,8 +24,8 @@ background-color:#fff;
 }
 
 QMenuBar::item:selected {
-background-color: #8cdb79;
-color: #5874cf;
+background-color: #1c75bc;
+color: #333;
 }
 
 QMenu {
@@ -37,11 +37,12 @@ color:#333;
 }
 
 QMenu::item:selected {
-background-color: #8cdb79;
-color: #5874cf;
+background-color: #5874cf;
+color: #333;
 }
 
 QToolBar {
+min-width: 180px;
 background-color:#5874cf;
 border:0;
 padding:0;
@@ -49,13 +50,13 @@ margin:0;
 }
 
 QToolBar > QToolButton {
-background-color:#5874cf;
+min-width: 180px;
+background-color:#5974cf;
 border:0;
 font-size: 14px;
-min-width: 70px;
 min-height: 48%;
 max-height: 48%;
-padding: 0 10px;
+padding: 0;
 margin: 0;
 color:#f5f5f5;
 }
@@ -64,6 +65,11 @@ QToolBar > QToolButton:checked {
 background-color:#18203a;
 border: 0;
 font-weight: bold;
+}
+
+QToolBar > QToolButton:hover:!checked {
+    color: #9e9e9e;
+    font-weight: bold;
 }
 
 QToolBar > QLabel {
@@ -325,7 +331,7 @@ font-size:12px;
 }
 
 QTableView::item:selected { /* Table Item Selected */
-background-color:#8cdb79;
+background-color:#1c75bc;
 color:#333;
 }
 
@@ -667,7 +673,7 @@ background-color:transparent;
 }
 
 QWidget#RPCConsole .QGroupBox #line { /* Network In Line */
-background-color:#00ff00;
+background-color: #183e5e;
 }
 
 QWidget#RPCConsole .QGroupBox #line_2 { /* Network Out Line */

@@ -1204,9 +1204,9 @@ CAmount GetSmartnodePayment(int nHeight, CAmount blockValue, CAmount specialTxFe
     if (chainActive.Tip() != nullptr){ //fix empty list when -checklevel = 4
           mnCount = deterministicMNManager->GetListForBlock(chainActive[nHeight - 1]).GetAllMNsCount();      
     }
-	if(mnCount >= 10) {
+	if(mnCount >= 150 || (mnCount >= 10 && Params().NetworkIDString() != CBaseChainParams::MAIN)) {
 		int percentage = Params().GetConsensus().nCollaterals.getRewardPercentage(nHeight);
-		CAmount specialFeeReward = specialTxFees * Params().GetConsensus().nAssetsRewardShare.smartnode; 
+		CAmount specialFeeReward = specialTxFees * Params().GetConsensus().nSpecialRewardShare.smartnode; 
         return blockValue * percentage / 100 + specialFeeReward;
 	} else {
 		return 0;
@@ -3842,7 +3842,7 @@ static bool FindUndoPos(CValidationState &state, int nFile, CDiskBlockPos &pos, 
 static bool CheckBlockHeader(const CBlockHeader& block, CValidationState& state, const Consensus::Params& consensusParams, bool fCheckPOW = true)
 {
      // If we are checking a KAWPOW block below a know checkpoint height. We can validate the proof of work using the mix_hash
-    if (fCheckPOW && block.nTime >= nKAWPOWActivationTime) {
+    if (fCheckPOW && block.nTime >= 1651444217) {
         CBlockIndex* pcheckpoint = Checkpoints::GetLastCheckpoint(Params().Checkpoints());
         if (fCheckPOW && pcheckpoint && block.nHeight <= (uint32_t)pcheckpoint->nHeight) {
            if (!CheckProofOfWork(block.GetHash(), block.nBits, consensusParams)) {
@@ -3859,7 +3859,7 @@ static bool CheckBlockHeader(const CBlockHeader& block, CValidationState& state,
         return state.DoS(50, false, REJECT_INVALID, "high-hash", false, "proof of work failed");
     }
 
-    if (fCheckPOW && block.nTime >= nKAWPOWActivationTime) {
+    if (fCheckPOW && block.nTime >= 1651444217) {
         if (mix_hash != block.mix_hash) {
             return state.DoS(50, false, REJECT_INVALID, "invalid-mix-hash", false, "mix_hash validity failed");
         }

@@ -123,12 +123,12 @@ struct LLMQParams {
     int keepOldConnections;
 };
 
-struct AssetsRewardShare {
+struct SpecialRewardShare {
 	float smartnode;
 	float miner;
 	float founder;
-	AssetsRewardShare() : smartnode(0), miner(0), founder(0) {}
-	AssetsRewardShare(float _smartnode, float _miner, float _founder) : smartnode(_smartnode), miner(_miner), founder(_founder) {}
+	SpecialRewardShare() : smartnode(0), miner(0), founder(0) {}
+	SpecialRewardShare(float _smartnode, float _miner, float _founder) : smartnode(_smartnode), miner(_miner), founder(_founder) {}
 };
 
 /**
@@ -196,7 +196,7 @@ struct Params {
     LLMQType llmqTypeInstantSend{LLMQ_NONE};
 
     FounderPayment nFounderPayment;
-    AssetsRewardShare nAssetsRewardShare;
+    SpecialRewardShare nSpecialRewardShare;
     SmartnodeCollaterals nCollaterals;
     int smartnodePaymentFixedBlock;
     int nAssetsForkBlock;

@@ -94,10 +94,6 @@ public:
     int PoolMinParticipants() const { return nPoolMinParticipants; }
     int PoolMaxParticipants() const { return nPoolMaxParticipants; }
     int FulfilledRequestExpireTime() const { return nFulfilledRequestExpireTime; }
-    bool IsAssetsActive(CBlockIndex *index) const {
-        int height = index == nullptr ? 0 : index->nHeight;
-        return height >= GetConsensus().nAssetsForkBlock;
-    };
     /** NEOXA Start **/
     const CAmount& IssueAssetBurnAmount() const { return nIssueAssetBurnAmount; }
     const CAmount& ReissueAssetBurnAmount() const { return nReissueAssetBurnAmount; }

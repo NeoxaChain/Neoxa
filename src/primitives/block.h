@@ -21,8 +21,6 @@
  * of the block.
  */
 
-extern uint32_t nKAWPOWActivationTime;
-
 class CBlockHeader
 {
 public:

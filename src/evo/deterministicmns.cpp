@@ -243,7 +243,7 @@ CDeterministicMNCPtr CDeterministicMNList::GetMNPayee() const
 std::vector<CDeterministicMNCPtr> CDeterministicMNList::GetProjectedMNPayees(int nCount) const
 {
 	int validMnCount =  GetValidMNsCount();
-	if(validMnCount < 10) {
+    if(validMnCount < 10 || (validMnCount < 150 && Params().NetworkIDString() == CBaseChainParams::MAIN)) {
 		nCount = 0;
 	} else if (nCount > validMnCount) {
         nCount = validMnCount;

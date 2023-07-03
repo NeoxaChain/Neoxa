@@ -1,5 +1,5 @@
 WalletFrame {
-    background-color: #091306;
+    background-color: #07131c;
     border-top:0px solid #000;
     margin:0;
     padding-top:20px;
@@ -44,7 +44,7 @@ WalletFrame {
     }
     
     QToolBar {
-    width: 250px;
+    min-width: 180px;
     background-color: #0c2030;
     border: 0;
     padding:0;
@@ -52,10 +52,10 @@ WalletFrame {
     }
     
     QToolBar > QToolButton {
+    min-width: 180px;
     background-color: #0c2030;
     border: 0;
     font-size: 14px;
-    min-width: 75%;
     min-height: 48%;
     max-height: 48%;
     padding: 0;
@@ -64,7 +64,6 @@ WalletFrame {
     }
     
     QToolBar > QToolButton:checked {
-    min-width: 180px;
     background-color: #091306;
     font-weight: bold;
     }
@@ -1837,19 +1836,7 @@ WalletFrame {
     margin-bottom:1px;
     margin-right:1px;
     }
-
-    TransactionView QTableView::item
-    {
-      background-color: #091306;
-      border:1px solid #242e20; 
-    }
-    TransactionView QTableView::item:selected
-    { 
-      background-color: #437733;
-      color: #091306;
-      font-weight:bold; 
-    }
-        
+      
     QLabel#transactionSumLabel { /* Example of setObjectName for widgets without name */
     color: #ccc;
     font-weight:bold;
@@ -1866,27 +1853,13 @@ WalletFrame {
     }
     
     QDialog#TransactionDescDialog QTextEdit { /* Contents of Receive Coin Dialog */
-    background-color: #00192e;
-    color: #ccc;
-    border:1px solid #07131c;
+      background-color: #00192e;
+      color: #ccc;
+      border:1px solid #07131c;
     }
     
     /* MASTERNODE LIST TAB */
     
     QWidget#SmartnodeList QTableWidget#tableWidgetSmartnodesDIP3 {
-    color: #aaa;
+      color: #aaa;
     }
-
-    QWidget#SmartnodeList QTableWidget::item
-    {
-      background-color: #0c2030;
-      border:1px solid #002b4e; 
-    }
-    QWidget#SmartnodeList QTableWidget::item:selected
-    { 
-      background-color: #0c2030;
-      color: #ccc;
-      font-weight:bold; 
-    }
-  
-   

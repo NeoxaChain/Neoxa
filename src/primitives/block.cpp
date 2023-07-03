@@ -10,8 +10,6 @@
 #include <util.h>
 #include <utilstrencodings.h>
 
-uint32_t nKAWPOWActivationTime = 1651444217;
-
 uint256 CBlockHeader::GetHash() const
 {
 	//return SerializeHash(*this);
