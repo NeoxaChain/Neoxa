@@ -61,21 +61,21 @@ static const bool DEFAULT_WHITELISTRELAY = true;
 /** Default for DEFAULT_WHITELISTFORCERELAY. */
 static const bool DEFAULT_WHITELISTFORCERELAY = true;
 /** Default for -minrelaytxfee, minimum relay fee for transactions */
-static const unsigned int DEFAULT_MIN_RELAY_TX_FEE = 1000;
+static const unsigned int DEFAULT_MIN_RELAY_TX_FEE = 1000000;
 //! -maxtxfee default
-static const CAmount DEFAULT_TRANSACTION_MAXFEE = 0.1 * COIN;
+static const CAmount DEFAULT_TRANSACTION_MAXFEE = 1000 * COIN;
 //! Discourage users to set fees higher than this amount (in duffs) per kB
-static const CAmount HIGH_TX_FEE_PER_KB = 0.01 * COIN;
+static const CAmount HIGH_TX_FEE_PER_KB = 0.1 * COIN;
 //! -maxtxfee will warn if called with a higher fee than this amount (in duffs)
 static const CAmount HIGH_MAX_TX_FEE = 100 * HIGH_TX_FEE_PER_KB;
 /** Default for -limitancestorcount, max number of in-mempool ancestors */
-static const unsigned int DEFAULT_ANCESTOR_LIMIT = 25;
+static const unsigned int DEFAULT_ANCESTOR_LIMIT = 200;
 /** Default for -limitancestorsize, maximum kilobytes of tx + all in-mempool ancestors */
-static const unsigned int DEFAULT_ANCESTOR_SIZE_LIMIT = 101;
+static const unsigned int DEFAULT_ANCESTOR_SIZE_LIMIT = 250;
 /** Default for -limitdescendantcount, max number of in-mempool descendants */
-static const unsigned int DEFAULT_DESCENDANT_LIMIT = 25;
+static const unsigned int DEFAULT_DESCENDANT_LIMIT = 200;
 /** Default for -limitdescendantsize, maximum kilobytes of in-mempool descendants */
-static const unsigned int DEFAULT_DESCENDANT_SIZE_LIMIT = 101;
+static const unsigned int DEFAULT_DESCENDANT_SIZE_LIMIT = 250;
 /** Default for -mempoolexpiry, expiration time for mempool transactions in hours */
 static const unsigned int DEFAULT_MEMPOOL_EXPIRY = 336;
 /** Maximum kilobytes for transactions to store for processing during reorg */
