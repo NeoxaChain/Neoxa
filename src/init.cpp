@@ -719,8 +719,8 @@ std::string HelpMessage(HelpMessageMode mode)
 
 std::string LicenseInfo()
 {
-    const std::string URL_SOURCE_CODE = "<https://github.com/The-Neoxa-Endeavor/neoxa>";
-    const std::string URL_WEBSITE = "<https://neoxa.org>";
+    const std::string URL_SOURCE_CODE = "<https://github.com/NeoxaChain/Neoxa>";
+    const std::string URL_WEBSITE = "<https://neoxa.net>";
 
     return CopyrightHolders(_("Copyright (C)"), 2014, COPYRIGHT_YEAR) + "\n" +
            "\n" +
