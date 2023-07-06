@@ -33,7 +33,7 @@ static const int MAX_URI_LENGTH = 255;
 #define SPINNER_FRAMES 36
 
 #define QAPP_ORG_NAME "Neoxa"
-#define QAPP_ORG_DOMAIN "neoxa.org"
+#define QAPP_ORG_DOMAIN "neoxa.net"
 #define QAPP_APP_NAME_DEFAULT "Neoxa-Qt-v2"
 #define QAPP_APP_NAME_TESTNET "Neoxa-Qt-v2-testnet"
 #define QAPP_APP_NAME_DEVNET "Neoxa-Qt-v2-%s"
