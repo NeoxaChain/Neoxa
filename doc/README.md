@@ -22,15 +22,6 @@ Unpack the files into a directory, and then run neoxa-qt.exe.
 
 Drag Neoxa-Qt to your applications folder, and then run Neoxa-Qt.
 
-### Need Help?
-
-* See the [Neoxa documentation](https://docs.neoxa.org)
-for help and more information.
-* See the [Neoxa Developer Documentation](https://neoxa-docs.github.io/) 
-for technical specifications and implementation details.
-* Ask for help on [Neoxa Nation Discord](http://neoxachat.org)
-* Ask for help on the [Neoxa Forum](https://neoxa.org/forum)
-
 Building
 ---------------------
 The following are developer notes on how to build Neoxa Core on your native platform. They are not complete guides, but include notes on the necessary libraries, compile flags, etc.
@@ -57,10 +48,6 @@ The Neoxa Core repo's [root README](/README.md) contains relevant information on
 - [BIPS](bips.md)
 - [Dnsseed Policy](dnsseed-policy.md)
 - [Benchmarking](benchmarking.md)
-
-### Resources
-* Discuss on the [Neoxa Forum](https://neoxa.org/forum), in the Development & Technical Discussion board.
-* Discuss on [Neoxa Nation Discord](http://neoxachat.org)
 
 ### Miscellaneous
 - [Assets Attribution](assets-attribution.md)
