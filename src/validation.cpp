@@ -4000,7 +4000,7 @@ static bool ContextualCheckBlock(const CBlock& block, CValidationState& state, c
 
     // Start enforcing BIP113 (Median Time Past) using versionbits logic.
     int nLockTimeFlags = 0;
-    if (consensusParams.BIPCSVEnabled) {
+    if (consensusParams.BIPCSVEnabled && nHeight > 0) {
         nLockTimeFlags |= LOCKTIME_MEDIAN_TIME_PAST;
     }
 
@@ -4008,7 +4008,7 @@ static bool ContextualCheckBlock(const CBlock& block, CValidationState& state, c
                               ? pindexPrev->GetMedianTimePast()
                               : block.GetBlockTime();
 
-    bool fDIP0003Active_context = isDIPDIP0003Active(pindexPrev->nHeight);
+    bool fDIP0003Active_context = isDIPDIP0003Active(pindexPrev == nullptr ? 0 :pindexPrev->nHeight);
 
     // Size limits
     if (block.vtx.empty() || block.vtx.size() * WITNESS_SCALE_FACTOR > GetMaxBlockWeight() || ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION | SERIALIZE_TRANSACTION_NO_WITNESS) * WITNESS_SCALE_FACTOR > GetMaxBlockWeight())

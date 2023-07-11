@@ -1836,20 +1836,7 @@ bool CWallet::IsMine(const CTransaction& tx) const
 
 bool CWallet::IsFromMe(const CTransaction& tx) const
 {
-    return (GetDebit(tx, ISMINE_ALL) > 0 || HasMyAssets(tx));
-}
-
-CAmount CWallet::HasMyAssets(const CTransaction& tx) const
-{
-    for (const CTxIn& txin : tx.vin)
-    {
-        CAssetOutputEntry assetData;
-        GetDebit(txin, ISMINE_ALL, assetData);
-        if (assetData.nAmount > 0)
-            return true;
-    }
-
-    return false;
+    return (GetDebit(tx, ISMINE_ALL) > 0);
 }
 
 CAmount CWallet::GetDebit(const CTransaction& tx, const isminefilter& filter) const
