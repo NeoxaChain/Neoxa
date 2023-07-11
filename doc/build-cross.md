@@ -58,7 +58,7 @@ If you want to build the windows installer with `make deploy` you need [NSIS](ht
 
 Acquire the source in the usual way:
 
-    git clone https://github.com/The-Neoxa-Endeavor/neoxa
+    git clone [https://github.com/NeoxaChain/Neoxa](https://github.com/NeoxaChain/Neoxa)
     cd neoxa
 
 ### Building for 64-bit Windows
