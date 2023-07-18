@@ -26,6 +26,7 @@
 
 #include <QAbstractItemDelegate>
 #include <QPainter>
+#include <QDesktopServices>
 #include <QSettings>
 #include <QTimer>
 #include <QMouseEvent>
@@ -438,7 +439,6 @@ void OverviewPage::handleAssetRightClicked(const QModelIndex &index)
         // Grab the data elements from the index that we need to disable and enable menu items
         QString name = index.data(AssetTableModel::AssetNameRole).toString();
         QString ipfshash = index.data(AssetTableModel::AssetIPFSHashRole).toString();
-        QString ipfsbrowser = walletModel->getOptionsModel()->getIpfsUrl();
 
         if (IsAssetNameAnOwner(name.toStdString())) {
             name = name.left(name.size() - 1);
@@ -448,7 +448,7 @@ void OverviewPage::handleAssetRightClicked(const QModelIndex &index)
         }
 
         // If the ipfs hash isn't there or doesn't start with Qm, disable the action item
-        if (ipfshash.count() > 0 && ipfshash.indexOf("Qm") == 0 && ipfsbrowser.indexOf("http") == 0 ) {
+        if (ipfshash.count() > 0 && ipfshash.indexOf("Qm") == 0) {
             openURL->setDisabled(false);
         } else {
             openURL->setDisabled(true);
@@ -494,7 +494,7 @@ void OverviewPage::handleAssetRightClicked(const QModelIndex &index)
             else if (action->objectName() == "Copy Hash")
                 GUIUtil::setClipboard(ipfshash);
             else if (action->objectName() == "Browse") {
-                //QDesktopServices::openUrl(QUrl::fromUserInput(ipfsbrowser.replace("%s", ipfshash)));
+                QDesktopServices::openUrl(QUrl::fromUserInput("https://cloudflare-ipfs.com/ipfs/" + ipfshash));
             }
         }
     }
@@ -985,21 +985,9 @@ void OverviewPage::openIPFSForAsset(const QModelIndex &index)
 {
     // Get the ipfs hash of the asset clicked
     QString ipfshash = index.data(AssetTableModel::AssetIPFSHashRole).toString();
-    QString ipfsbrowser = walletModel->getOptionsModel()->getIpfsUrl();
 
     // If the ipfs hash isn't there or doesn't start with Qm, disable the action item
-    if (ipfshash.count() > 0 && ipfshash.indexOf("Qm") == 0 && ipfsbrowser.indexOf("http") == 0)
-    {
-        QUrl ipfsurl = QUrl::fromUserInput(ipfsbrowser.replace("%s", ipfshash));
-
-        // Create the box with everything.
-        if(QMessageBox::Yes == QMessageBox::question(this,
-                                                        tr("Open IPFS content?"),
-                                                        tr("Open the following IPFS content in your default browser?\n")
-                                                        + ipfsurl.toString()
-                                                    ))
-        {
-        //QDesktopServices::openUrl(ipfsurl);
-        }
+    if (ipfshash.count() > 0 && ipfshash.indexOf("Qm") == 0) {
+        QDesktopServices::openUrl(QUrl::fromUserInput("https://cloudflare-ipfs.com/ipfs/" + ipfshash));
     }
 }

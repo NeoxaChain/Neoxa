@@ -78,8 +78,6 @@ public:
     bool getShowAdvancedPSUI() { return fShowAdvancedPSUI; }
     const QString& getOverriddenByCommandLine() { return strOverriddenByCommandLine; }
 
-    QString getIpfsUrl() const { return strIpfsUrl; }
-
     /* Restart flag helper */
     void setRestartRequired(bool fRequired);
     bool isRestartRequired();
@@ -97,8 +95,6 @@ private:
     bool fShowAdvancedPSUI;
     /* settings that were overridden by command-line */
     QString strOverriddenByCommandLine;
-
-    QString strIpfsUrl;
     
     // Add option to list of GUI options overridden through command line/config file
     void addOverriddenOption(const std::string &option);

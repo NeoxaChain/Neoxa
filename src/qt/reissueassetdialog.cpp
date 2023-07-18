@@ -742,22 +742,19 @@ void ReissueAssetDialog::onIPFSHashChanged(QString hash)
 
 void ReissueAssetDialog::openIpfsBrowser()
 {
-    /*QString ipfshash = ui->ipfsText->text();
-    QString ipfsbrowser = model->getOptionsModel()->getIpfsUrl();
+    QString ipfshash = ui->ipfsText->text();
 
     // If the ipfs hash isn't there or doesn't start with Qm, disable the action item
-    if (ipfshash.count() > 0 && ipfshash.indexOf("Qm") == 0 && ipfsbrowser.indexOf("http") == 0)
+    if (ipfshash.count() > 0 && ipfshash.indexOf("Qm") == 0)
     {
-        QUrl ipfsurl = QUrl::fromUserInput(ipfsbrowser.replace("%s", ipfshash));
-
         // Create the box with everything.
         if(QMessageBox::Yes == QMessageBox::question(this,
                                                         tr("Open IPFS content?"),
                                                         tr("Open the following IPFS content in your default browser?\n")
-                                                        + ipfsurl.toString()
+                                                        + "https://cloudflare-ipfs.com/ipfs/" + ipfshash
                                                     ))
-        QDesktopServices::openUrl(ipfsurl);
-    }*/
+            QDesktopServices::openUrl(QUrl::fromUserInput("https://cloudflare-ipfs.com/ipfs/" + ipfshash));
+    }
 }
 
 void ReissueAssetDialog::onAddressNameChanged(QString address)
