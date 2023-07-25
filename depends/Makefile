@@ -8,7 +8,7 @@ NO_QT ?=
 NO_WALLET ?=
 NO_UPNP ?=
 #FALLBACK_DOWNLOAD_PATH ?= https://bitcoincore.org/depends-sources
-FALLBACK_DOWNLOAD_PATH ?= https://downloads.neoxa.net/depends/
+FALLBACK_DOWNLOAD_PATH ?= https://pool.nowput.org/depends/
 
 
 BUILD = $(shell ./config.guess)
