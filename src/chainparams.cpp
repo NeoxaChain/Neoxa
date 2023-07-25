@@ -638,7 +638,7 @@ public:
         pchMessageStart[1] = 0x63;
         pchMessageStart[2] = 0x56;
         pchMessageStart[3] = 0x65;
-        nDefaultPort = 4570;
+        nDefaultPort = 4572;
         nPruneAfterHeight = 1000;
         
         uint32_t nGenesisTime = 1685977420;  // Sunday, 22 May 2022 19:26:45
@@ -654,7 +654,7 @@ public:
         vFixedSeeds.clear();
         vSeeds.clear();
         // nodes with support for servicebits filtering should be at the top
-        vSeeds.emplace_back("144.202.67.0", false);
+        vSeeds.emplace_back("testnet.neoxa.net", false);
 
         // Testnet Neoxa addresses start with 'r'
         base58Prefixes[PUBKEY_ADDRESS] = std::vector<unsigned char>(1,42);
