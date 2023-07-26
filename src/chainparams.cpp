@@ -373,7 +373,7 @@ public:
         consensus.BIP66Enabled = true; // 00000000000b1fa2dfa312863570e13fae9ca7b5566cb27e55422620b469aefa
         consensus.nSegwitEnabled = true;
         consensus.DIP0003Height = 620000;
-        consensus.DIP0008Enabled = false;
+        consensus.DIP0008Enabled = true;
        // consensus.DIP0003EnforcementHeight = 1047200;
         consensus.powLimit = uint256S("00ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"); // ~uint256(0) >> 20
         consensus.nPowTargetTimespan = 2016 * 60; // Neoxa: 1 day
@@ -469,7 +469,7 @@ public:
           { 
             {INT_MAX, 1000000 * COIN}
           },
-          { {999999, 0}, {INT_MAX, 45} }
+          { {622500, 0}, {INT_MAX, 45} }
         );
 
         vFixedSeeds = std::vector<SeedSpec6>(pnSeed6_main, pnSeed6_main + ARRAYLEN(pnSeed6_main));
