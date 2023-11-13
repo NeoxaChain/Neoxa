@@ -1,4 +1,4 @@
-# Neoxa Core <img src="https://github.com/0x00ASTRA/imgs/blob/da8ce370006ff3cf71a45b8f3bc0c744dccb573a/crypto/NEOX.png" width=120>
+# Neoxa Core <img src="https://github.com/0x00ASTRA/imgs/blob/da8ce370006ff3cf71a45b8f3bc0c744dccb573a/crypto/NEOX.png" width=30>
 
 ---
 
