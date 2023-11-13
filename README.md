@@ -8,17 +8,17 @@ Visit our website:
 
 ## Navigation 🧭
 
-> [Introduction](#introduction)
+> [Introduction](#introduction-🚩)
 >
-> [Installation](#installation)
+> [Installation](#installation-⚙️)
 >
->[License](#license)
+>[License](#license-🔏)
 >
->[Development](#development)
+>[Development](#development-👨‍💻)
 
 ---
 
-## Introduction
+## Introduction 🚩
 
 Welcome to the Neoxa Project! Below you can find general information about the project including installation instructions and development insight. Thank you for supporting Neoxa!
 
