@@ -32,7 +32,7 @@ Neoxa is dedicated to providing gamers with the opportunity to earn Neoxa crypto
 
 In contrast to numerous blockchain projects that lack realistic goals or fail to follow through with their plans, Neoxa stands apart by delivering a Proof of Concept right from its launch. We believe in demonstrating the feasibility of our ideas and ensuring tangible progress, earning the trust and confidence of our community.
 
-### NEOX | Neoxa Token
+### NEOX | Neoxa Coin
 
 Neoxa (NEOX) serves as a versatile currency catering to investors, gamers, and gaming developers alike. To enhance the gaming experience and provide earning opportunities, Neoxa has implemented innovative Play to Earn mechanisms within popular games such as Minecraft, Rust, and Grand Theft Auto. By participating in these games, our dedicated gamers can effortlessly earn Neoxa without requiring any financial investment. For more information visit the [Neoxa Website](https://neoxa.net).
 
