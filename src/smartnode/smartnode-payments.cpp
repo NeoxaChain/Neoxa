@@ -162,12 +162,6 @@ bool IsBlockValueValid(const CBlock& block, int nBlockHeight, CAmount blockRewar
 
 bool IsBlockPayeeValid(const CTransaction& txNew, int nBlockHeight, CAmount blockReward, CAmount specialTxFees)
 {
-    if(fLiteMode) {
-        //there is no budget data to use to check anything, let's just accept the longest chain
-        LogPrint(BCLog::MNPAYMENTS, "%s -- WARNING: Not enough data, skipping block payee checks\n", __func__);
-        return true;
-    }
-
     // we are still using budgets, but we have no data about them anymore,
     // we can only check smartnode payments
 
