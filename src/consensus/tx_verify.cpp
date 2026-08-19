@@ -652,10 +652,16 @@ bool Consensus::CheckTxAssets(const CTransaction& tx, CValidationState& state, c
                 return state.DoS(100, false, REJECT_INVALID, "bad-txns-failed-to-get-asset-from-script");
 
             // Add to the total value of assets in the inputs
+            if (!MoneyRange(data.nAmount))
+                return state.DoS(100, false, REJECT_INVALID, "bad-txns-asset-input-amount-outofrange");
+
             if (totalInputs.count(data.assetName))
                 totalInputs.at(data.assetName) += data.nAmount;
             else
                 totalInputs.insert(make_pair(data.assetName, data.nAmount));
+
+            if (!MoneyRange(totalInputs.at(data.assetName)))
+                return state.DoS(100, false, REJECT_INVALID, "bad-txns-asset-total-input-outofrange");
 
             if (AreMessagesDeployed()) {
                 mapAddresses.insert(make_pair(data.assetName,EncodeDestination(data.destination)));
@@ -716,10 +722,16 @@ bool Consensus::CheckTxAssets(const CTransaction& tx, CValidationState& state, c
                 return state.DoS(100, false, REJECT_INVALID, strError );
 
             // Add to the total value of assets in the outputs
+            if (!MoneyRange(transfer.nAmount))
+                return state.DoS(100, false, REJECT_INVALID, "bad-txns-transfer-asset-amount-outofrange");
+
             if (totalOutputs.count(transfer.strName))
                 totalOutputs.at(transfer.strName) += transfer.nAmount;
             else
                 totalOutputs.insert(make_pair(transfer.strName, transfer.nAmount));
+
+            if (!MoneyRange(totalOutputs.at(transfer.strName)))
+                return state.DoS(100, false, REJECT_INVALID, "bad-txns-asset-total-output-outofrange");
 
             if (!fRunningUnitTests) {
                 if (IsAssetNameAnOwner(transfer.strName)) {
