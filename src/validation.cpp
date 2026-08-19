@@ -3943,6 +3943,9 @@ static bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationSta
     assert(pindexPrev != nullptr);
     const int nHeight = pindexPrev->nHeight + 1;
 
+    if (block.nHeight != (uint32_t)nHeight)
+        return state.DoS(100, false, REJECT_INVALID, "bad-height", false, strprintf("block nHeight %u does not match expected %d", block.nHeight, nHeight));
+
     // Check proof of work
     const Consensus::Params& consensusParams = params.GetConsensus();
     if (block.nBits != GetNextWorkRequired(pindexPrev, &block, consensusParams))
